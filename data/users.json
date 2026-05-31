@@ -1,1 +1,20 @@
-{}
+{
+  "818748106": {
+    "telegram_id": 818748106,
+    "username": "kostik3686",
+    "first_name": "Костя",
+    "last_name": null,
+    "balance": 5,
+    "created_at": "2026-05-31T20:47:03.567930",
+    "updated_at": "2026-05-31T20:49:12.273695"
+  },
+  "5311640125": {
+    "telegram_id": 5311640125,
+    "username": null,
+    "first_name": "Matvei",
+    "last_name": null,
+    "balance": 0,
+    "created_at": "2026-05-31T20:49:49.105154",
+    "updated_at": "2026-05-31T20:49:49.105160"
+  }
+}
