@@ -10,10 +10,15 @@
 <body>
   <main class="app">
     <section class="hero">
-      <div>
-        <p class="label">Командная мотивация</p>
-        <h1>Спасибки</h1>
+      <div class="hero-copy">
+        <p class="label">Командная мотивация ресторана</p>
+        <h1><span>Мои</span> Спасибки</h1>
         <p id="userName" class="muted">Загрузка пользователя...</p>
+        <div class="hero-badges">
+          <span>🍔 смена</span>
+          <span>🔥 скорость</span>
+          <span>👑 качество</span>
+        </div>
       </div>
       <div class="balance-card">
         <span>Мой баланс</span>
@@ -30,8 +35,12 @@
     </nav>
 
     <section class="tab-page active" id="tab-home">
+      <div class="promo-strip">
+        <strong>Собирай спасибки</strong>
+        <span>Стань героем месяца и забери приз</span>
+      </div>
       <div class="grid">
-        <article class="card">
+        <article class="card stats-card">
           <h2>📊 Моя статистика</h2>
           <div id="myStats" class="list"></div>
         </article>
@@ -43,15 +52,16 @@
     </section>
 
     <section class="tab-page" id="tab-rating">
-      <article class="card">
+      <article class="card rating-card">
         <h2>🏆 Топ-3 за месяц</h2>
         <div id="topMonth" class="list"></div>
       </article>
     </section>
 
     <section class="tab-page" id="tab-shop">
-      <article class="card">
+      <article class="card shop-card">
         <h2>🎁 Магазин призов</h2>
+        <p class="section-note">Обменивай спасибки на приятные бонусы. Чем активнее смена — тем ближе приз.</p>
         <div id="products" class="products"></div>
       </article>
     </section>
