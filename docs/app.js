@@ -28,13 +28,14 @@ document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", (
 
 async function loadData() {
   const response = await fetch(`public-data.json?v=${Date.now()}`);
-  if (!response.ok) throw new Error("Не удалось загрузить данные");
+  if (!response.ok) throw new Error("Данные временно недоступны");
   return response.json();
 }
 
 function getUserRank(data, currentUserId) {
   const rows = Object.entries(data.users || {})
     .map(([id, item]) => ({ id, amount: Number(item.received_month || 0) }))
+    .filter(row => row.amount > 0)
     .sort((a, b) => b.amount - a.amount);
   const index = rows.findIndex(row => row.id === currentUserId);
   return index >= 0 ? index + 1 : null;
@@ -43,7 +44,7 @@ function getUserRank(data, currentUserId) {
 function renderTop(items) {
   const root = document.getElementById("topMonth");
   if (!items || items.length === 0) {
-    root.innerHTML = `<p>Пока никто не получил спасибки в этом месяце. Будь первым героем смены!</p>`;
+    root.innerHTML = `<p>Рейтинг пока пуст.</p>`;
     return;
   }
   root.innerHTML = items.slice(0, 3).map((item, index) => `
@@ -51,7 +52,7 @@ function renderTop(items) {
       <div class="rank-medal">${medal[index] || "🏅"}</div>
       <div>
         <strong>${htmlEscape(item.name || "Сотрудник")}</strong>
-        <span>${Number(item.amount || 0)} спасибок за месяц</span>
+        <span>${Number(item.amount || 0)} спасибок</span>
       </div>
     </div>
   `).join("");
@@ -61,14 +62,14 @@ function renderHero(items) {
   const root = document.getElementById("heroMonth");
   const hero = items?.[0];
   if (!hero) {
-    root.innerHTML = `<p>Герой месяца пока не определён. Начисли первые спасибки через админку.</p>`;
+    root.innerHTML = `<p>Пока не определён.</p>`;
     return;
   }
   root.innerHTML = `
     <div class="hero-person">
       <div class="hero-avatar">👑</div>
       <strong>${htmlEscape(hero.name || "Сотрудник")}</strong>
-      <span>${Number(hero.amount || 0)} спасибок за месяц</span>
+      <span>${Number(hero.amount || 0)} спасибок</span>
       <div class="progress"><i style="width:${Math.min(100, Number(hero.amount || 0))}%"></i></div>
     </div>
   `;
@@ -78,7 +79,7 @@ function renderProducts(products) {
   const root = document.getElementById("products");
   const activeProducts = (products || []).filter(product => product.active !== false);
   if (activeProducts.length === 0) {
-    root.innerHTML = `<p>Магазин пока пуст. Скоро тут появятся вкусные призы.</p>`;
+    root.innerHTML = `<p>Магазин пуст.</p>`;
     return;
   }
   root.innerHTML = activeProducts.map(product => `
@@ -93,48 +94,32 @@ function renderProducts(products) {
 function renderMyStats(data) {
   const root = document.getElementById("myStats");
   const publicUser = userId ? data.users?.[userId] : null;
-  if (!userId) {
-    root.innerHTML = `<p>Открой приложение из Telegram, чтобы увидеть личную статистику.</p>`;
-    return;
-  }
-  if (!publicUser) {
-    root.innerHTML = `<p>Ты пока не в базе. Напиши боту /start или получи первые спасибки.</p>`;
+  if (!userId || !publicUser) {
+    root.innerHTML = `<p>Нет данных.</p>`;
     return;
   }
   const rank = getUserRank(data, userId);
   setText("balance", Number(publicUser.balance || 0));
   root.innerHTML = `
-    <div class="stat-row"><strong>${Number(publicUser.received_month || 0)}</strong><span>получено за месяц</span></div>
-    <div class="stat-row"><strong>${Number(publicUser.received_total || 0)}</strong><span>получено за всё время</span></div>
-    <div class="stat-row"><strong>${rank ? `#${rank}` : "—"}</strong><span>место в рейтинге месяца</span></div>
-    <div class="stat-row"><strong>${Number(publicUser.balance || 0)}</strong><span>можно потратить в магазине</span></div>
-  `;
-}
-
-function renderAdmin(data) {
-  const root = document.getElementById("adminStats");
-  if (!data.stats) return;
-  root.innerHTML = `
-    <div class="stat-row"><strong>${Number(data.stats.users_count || 0)}</strong><span>пользователей</span></div>
-    <div class="stat-row"><strong>${Number(data.stats.transactions_count || 0)}</strong><span>операций</span></div>
-    <div class="stat-row"><strong>${Number(data.stats.total_given_month || 0)}</strong><span>выдано за месяц</span></div>
-    <div class="stat-row"><strong>${htmlEscape(data.month || "")}</strong><span>текущий период</span></div>
+    <div class="stat-row"><strong>${Number(publicUser.received_month || 0)}</strong><span>за месяц</span></div>
+    <div class="stat-row"><strong>${Number(publicUser.received_total || 0)}</strong><span>за всё время</span></div>
+    <div class="stat-row"><strong>${rank ? `#${rank}` : "—"}</strong><span>место</span></div>
+    <div class="stat-row"><strong>${Number(publicUser.balance || 0)}</strong><span>баланс</span></div>
   `;
 }
 
 async function main() {
-  setText("userName", user ? `${user.first_name} · ${user.id}` : "Открыто вне Telegram");
+  setText("userName", user ? `${user.first_name}` : "Спасибки");
   try {
     const data = await loadData();
     renderTop(data.top_month);
     renderHero(data.top_month);
     renderProducts(data.products);
     renderMyStats(data);
-    renderAdmin(data);
   } catch (error) {
-    document.getElementById("topMonth").innerHTML = `<p>Не удалось загрузить статистику.</p>`;
-    document.getElementById("myStats").innerHTML = `<p>${htmlEscape(error.message)}</p>`;
-    document.getElementById("products").innerHTML = `<p>Попробуй обновить приложение.</p>`;
+    document.getElementById("topMonth").innerHTML = `<p>Нет данных.</p>`;
+    document.getElementById("myStats").innerHTML = `<p>Нет данных.</p>`;
+    document.getElementById("products").innerHTML = `<p>Нет данных.</p>`;
   }
 }
 
