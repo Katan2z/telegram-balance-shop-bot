@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Balance Shop</title>
+  <title>Спасибки</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -11,36 +11,56 @@
   <main class="app">
     <section class="hero">
       <div>
-        <p class="label">Telegram Mini App</p>
-        <h1>Магазин и баланс</h1>
+        <p class="label">Командная мотивация</p>
+        <h1>Спасибки</h1>
         <p id="userName" class="muted">Загрузка пользователя...</p>
       </div>
       <div class="balance-card">
-        <span>Баланс</span>
+        <span>Мой баланс</span>
         <strong id="balance">0</strong>
+        <small>спасибок</small>
       </div>
     </section>
 
-    <section class="grid">
+    <nav class="tabs">
+      <button class="tab active" data-tab="home">Главная</button>
+      <button class="tab" data-tab="rating">Рейтинг</button>
+      <button class="tab" data-tab="shop">Магазин</button>
+      <button class="tab" data-tab="admin">Админ</button>
+    </nav>
+
+    <section class="tab-page active" id="tab-home">
+      <div class="grid">
+        <article class="card">
+          <h2>📊 Моя статистика</h2>
+          <div id="myStats" class="list"></div>
+        </article>
+        <article class="card trophy-card">
+          <h2>🏆 Герой месяца</h2>
+          <div id="heroMonth" class="list"></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="tab-page" id="tab-rating">
       <article class="card">
         <h2>🏆 Топ-3 за месяц</h2>
         <div id="topMonth" class="list"></div>
       </article>
+    </section>
 
+    <section class="tab-page" id="tab-shop">
       <article class="card">
-        <h2>📊 Моя статистика</h2>
-        <div id="myStats" class="list"></div>
+        <h2>🎁 Магазин призов</h2>
+        <div id="products" class="products"></div>
       </article>
     </section>
 
-    <section class="card">
-      <h2>🛒 Магазин</h2>
-      <div id="products" class="products"></div>
-    </section>
-
-    <section class="card admin-only hidden" id="adminBlock">
-      <h2>👑 Админ-статистика</h2>
-      <div id="adminStats" class="list"></div>
+    <section class="tab-page" id="tab-admin">
+      <article class="card admin-only" id="adminBlock">
+        <h2>👑 Админ-статистика</h2>
+        <div id="adminStats" class="list"></div>
+      </article>
     </section>
   </main>
 
