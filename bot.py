@@ -7,12 +7,7 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import (
-    Message,
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -22,6 +17,8 @@ PRODUCTS_FILE = DATA_DIR / "products.json"
 TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
 CHATS_FILE = DATA_DIR / "chats.json"
 
+ADMIN_STATES: dict[int, str] = {}
+
 
 def now() -> str:
     return datetime.utcnow().isoformat()
@@ -30,7 +27,6 @@ def now() -> str:
 def read_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
-
     try:
         with path.open("r", encoding="utf-8") as file:
             return json.load(file)
@@ -47,12 +43,10 @@ def write_json(path: Path, data: Any) -> None:
 def get_admin_ids() -> set[int]:
     raw = os.getenv("ADMIN_IDS", "")
     result = set()
-
     for item in raw.split(","):
         item = item.strip()
         if item.isdigit():
             result.add(int(item))
-
     return result
 
 
@@ -62,7 +56,6 @@ def is_admin(user_id: int) -> bool:
 
 def save_user(user) -> dict:
     users = read_json(USERS_FILE, {})
-
     telegram_id = str(user.id)
 
     if telegram_id not in users:
@@ -88,9 +81,7 @@ def save_user(user) -> dict:
 def save_chat(chat) -> None:
     if chat.type == "private":
         return
-
     chats = read_json(CHATS_FILE, {})
-
     chat_id = str(chat.id)
 
     if chat_id not in chats:
@@ -113,9 +104,7 @@ def save_chat(chat) -> None:
 def save_chat_member(chat, user) -> None:
     if chat.type == "private" or user.is_bot:
         return
-
     save_chat(chat)
-
     chats = read_json(CHATS_FILE, {})
     chat_id = str(chat.id)
 
@@ -123,7 +112,6 @@ def save_chat_member(chat, user) -> None:
         return
 
     members = chats[chat_id].setdefault("members", [])
-
     if user.id not in members:
         members.append(user.id)
 
@@ -133,17 +121,13 @@ def save_chat_member(chat, user) -> None:
 
 def add_transaction(user_id: int, amount: int, transaction_type: str, comment: str = "") -> None:
     transactions = read_json(TRANSACTIONS_FILE, [])
-
-    transactions.append(
-        {
-            "user_id": user_id,
-            "amount": amount,
-            "type": transaction_type,
-            "comment": comment,
-            "created_at": now(),
-        }
-    )
-
+    transactions.append({
+        "user_id": user_id,
+        "amount": amount,
+        "type": transaction_type,
+        "comment": comment,
+        "created_at": now(),
+    })
     write_json(TRANSACTIONS_FILE, transactions)
 
 
@@ -162,23 +146,20 @@ def change_balance(user_id: int, amount: int, comment: str = "") -> int:
             "updated_at": now(),
         }
 
-    new_balance = users[key].get("balance", 0) + amount
-
+    new_balance = int(users[key].get("balance", 0)) + amount
     if new_balance < 0:
         raise ValueError("Недостаточно средств")
 
     users[key]["balance"] = new_balance
     users[key]["updated_at"] = now()
-
     write_json(USERS_FILE, users)
     add_transaction(user_id, amount, "balance_change", comment)
-
     return new_balance
 
 
 def get_balance(user_id: int) -> int:
     users = read_json(USERS_FILE, {})
-    return users.get(str(user_id), {}).get("balance", 0)
+    return int(users.get(str(user_id), {}).get("balance", 0))
 
 
 def get_products() -> list[dict]:
@@ -187,53 +168,107 @@ def get_products() -> list[dict]:
 
 
 def buy_product(user_id: int, product_id: int) -> dict:
-    products = get_products()
-
-    product = None
-    for item in products:
-        if int(item["id"]) == product_id:
-            product = item
-            break
-
+    product = next((item for item in get_products() if int(item["id"]) == product_id), None)
     if product is None:
         raise ValueError("Товар не найден")
 
     price = int(product["price"])
-
     if get_balance(user_id) < price:
         raise ValueError("Недостаточно средств")
 
     change_balance(user_id, -price, f"Покупка товара: {product['name']}")
-
     return product
 
 
-def main_menu() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
-            [InlineKeyboardButton(text="🛒 Магазин", callback_data="shop")],
-            [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
-        ]
-    )
+def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
+        [InlineKeyboardButton(text="🛒 Магазин", callback_data="shop")],
+        [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
+    ]
+    if user_id and is_admin(user_id):
+        buttons.append([InlineKeyboardButton(text="👑 Админка", callback_data="admin")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def shop_keyboard() -> InlineKeyboardMarkup:
     buttons = []
-
     for product in get_products():
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    text=f"{product['name']} — {product['price']}",
-                    callback_data=f"buy:{product['id']}",
-                )
-            ]
-        )
-
+        buttons.append([InlineKeyboardButton(text=f"{product['name']} — {product['price']}", callback_data=f"buy:{product['id']}")])
     buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")])
-
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def admin_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users")],
+        [InlineKeyboardButton(text="💰 Начислить баланс", callback_data="admin_add_balance")],
+        [InlineKeyboardButton(text="➖ Списать баланс", callback_data="admin_remove_balance")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="🧾 Последние операции", callback_data="admin_transactions")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")],
+    ])
+
+
+def admin_only_text() -> str:
+    return "⛔ У тебя нет доступа к админке."
+
+
+def format_user_line(user: dict) -> str:
+    username = user.get("username")
+    name = user.get("first_name") or "Без имени"
+    user_id = user.get("telegram_id")
+    balance = user.get("balance", 0)
+    nick = f"@{username}" if username else "без username"
+    return f"{user_id} | {name} | {nick} | баланс: {balance}"
+
+
+def get_users_text(limit: int = 20) -> str:
+    users = list(read_json(USERS_FILE, {}).values())
+    users.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+
+    if not users:
+        return "👥 Пользователей пока нет."
+
+    text = f"👥 Пользователей в базе: {len(users)}\n\n"
+    for user in users[:limit]:
+        text += format_user_line(user) + "\n"
+
+    if len(users) > limit:
+        text += f"\nПоказаны последние {limit}."
+    return text
+
+
+def get_stats_text() -> str:
+    users = read_json(USERS_FILE, {})
+    products = read_json(PRODUCTS_FILE, [])
+    transactions = read_json(TRANSACTIONS_FILE, [])
+    chats = read_json(CHATS_FILE, {})
+    total_balance = sum(int(user.get("balance", 0)) for user in users.values())
+    return (
+        "📊 Статистика\n\n"
+        f"Пользователей: {len(users)}\n"
+        f"Чатов: {len(chats)}\n"
+        f"Товаров: {len(products)}\n"
+        f"Операций: {len(transactions)}\n"
+        f"Общий баланс пользователей: {total_balance}"
+    )
+
+
+def get_transactions_text(limit: int = 10) -> str:
+    transactions = read_json(TRANSACTIONS_FILE, [])
+    if not transactions:
+        return "🧾 Операций пока нет."
+
+    text = "🧾 Последние операции:\n\n"
+    for item in transactions[-limit:][::-1]:
+        text += (
+            f"user_id: {item.get('user_id')}\n"
+            f"сумма: {item.get('amount')}\n"
+            f"тип: {item.get('type')}\n"
+            f"комментарий: {item.get('comment', '')}\n\n"
+        )
+    return text
 
 
 router = Router()
@@ -245,10 +280,7 @@ async def start_handler(message: Message):
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
 
-    await message.answer(
-        "Привет! Я бот магазина.\n\nВыбери действие:",
-        reply_markup=main_menu(),
-    )
+    await message.answer("Привет! Я бот магазина.\n\nВыбери действие:", reply_markup=main_menu(message.from_user.id if message.from_user else None))
 
 
 @router.message(F.new_chat_members)
@@ -256,11 +288,17 @@ async def new_members_handler(message: Message):
     for user in message.new_chat_members:
         if user.is_bot:
             continue
-
         save_user(user)
         save_chat_member(message.chat, user)
-
     await message.answer("✅ Новые участники добавлены в базу.")
+
+
+@router.message(Command("admin"))
+async def admin_command_handler(message: Message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        await message.answer(admin_only_text())
+        return
+    await message.answer("👑 Админка", reply_markup=admin_keyboard())
 
 
 @router.message(Command("add_balance"))
@@ -270,7 +308,6 @@ async def add_balance_handler(message: Message):
         return
 
     parts = message.text.split()
-
     if len(parts) != 3:
         await message.answer("Использование:\n/add_balance user_id amount")
         return
@@ -282,16 +319,13 @@ async def add_balance_handler(message: Message):
         await message.answer("user_id и amount должны быть числами.")
         return
 
-    new_balance = change_balance(
-        user_id=user_id,
-        amount=amount,
-        comment=f"Начисление админом {message.from_user.id}",
-    )
+    try:
+        new_balance = change_balance(user_id, amount, f"Начисление админом {message.from_user.id}")
+    except ValueError as error:
+        await message.answer(str(error))
+        return
 
-    await message.answer(
-        f"✅ Баланс пользователя {user_id} изменен на {amount}.\n"
-        f"Новый баланс: {new_balance}"
-    )
+    await message.answer(f"✅ Баланс пользователя {user_id} изменен на {amount}.\nНовый баланс: {new_balance}")
 
 
 @router.message(Command("users"))
@@ -299,10 +333,7 @@ async def users_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
         await message.answer("⛔ У тебя нет доступа к этой команде.")
         return
-
-    users = read_json(USERS_FILE, {})
-
-    await message.answer(f"👥 Пользователей в базе: {len(users)}")
+    await message.answer(get_users_text())
 
 
 @router.message()
@@ -311,56 +342,73 @@ async def collect_user_handler(message: Message):
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
 
+    if not message.from_user or not is_admin(message.from_user.id):
+        return
+
+    state = ADMIN_STATES.get(message.from_user.id)
+    if not state:
+        return
+
+    parts = message.text.split()
+    if len(parts) != 2:
+        await message.answer("Нужно отправить так:\nuser_id сумма\n\nНапример:\n123456789 500")
+        return
+
+    try:
+        user_id = int(parts[0])
+        amount = int(parts[1])
+    except ValueError:
+        await message.answer("user_id и сумма должны быть числами.")
+        return
+
+    if amount <= 0:
+        await message.answer("Сумма должна быть больше 0.")
+        return
+
+    if state == "add_balance":
+        real_amount = amount
+        comment = f"Начисление через админку админом {message.from_user.id}"
+    else:
+        real_amount = -amount
+        comment = f"Списание через админку админом {message.from_user.id}"
+
+    try:
+        new_balance = change_balance(user_id, real_amount, comment)
+    except ValueError as error:
+        await message.answer(str(error))
+        return
+
+    ADMIN_STATES.pop(message.from_user.id, None)
+    await message.answer(
+        f"✅ Готово.\nПользователь: {user_id}\nИзменение: {real_amount}\nНовый баланс: {new_balance}",
+        reply_markup=admin_keyboard(),
+    )
+
 
 @router.callback_query(F.data == "menu")
 async def menu_callback(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "Главное меню:",
-        reply_markup=main_menu(),
-    )
+    await callback.message.edit_text("Главное меню:", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
 
 
 @router.callback_query(F.data == "balance")
 async def balance_callback(callback: CallbackQuery):
-    if not callback.from_user:
-        await callback.answer()
-        return
-
     save_user(callback.from_user)
-
     balance = get_balance(callback.from_user.id)
-
-    await callback.message.edit_text(
-        f"💰 Твой баланс: {balance}",
-        reply_markup=main_menu(),
-    )
+    await callback.message.edit_text(f"💰 Твой баланс: {balance}", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
 
 
 @router.callback_query(F.data == "shop")
 async def shop_callback(callback: CallbackQuery):
     products = get_products()
-
     if not products:
-        await callback.message.edit_text(
-            "🛒 Магазин пока пуст.",
-            reply_markup=main_menu(),
-        )
+        await callback.message.edit_text("🛒 Магазин пока пуст.", reply_markup=main_menu(callback.from_user.id))
     else:
         text = "🛒 Магазин:\n\n"
         for product in products:
-            text += (
-                f"#{product['id']} — {product['name']}\n"
-                f"{product.get('description', '')}\n"
-                f"Цена: {product['price']}\n\n"
-            )
-
-        await callback.message.edit_text(
-            text,
-            reply_markup=shop_keyboard(),
-        )
-
+            text += f"#{product['id']} — {product['name']}\n{product.get('description', '')}\nЦена: {product['price']}\n\n"
+        await callback.message.edit_text(text, reply_markup=shop_keyboard())
     await callback.answer()
 
 
@@ -371,9 +419,10 @@ async def help_callback(callback: CallbackQuery):
         "💰 Баланс — проверить свой баланс.\n"
         "🛒 Магазин — посмотреть товары.\n\n"
         "Админ-команды:\n"
+        "/admin — открыть админку\n"
         "/add_balance user_id amount — начислить баланс\n"
-        "/users — количество пользователей",
-        reply_markup=main_menu(),
+        "/users — список пользователей",
+        reply_markup=main_menu(callback.from_user.id),
     )
     await callback.answer()
 
@@ -381,7 +430,6 @@ async def help_callback(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("buy:"))
 async def buy_callback(callback: CallbackQuery):
     product_id = int(callback.data.split(":")[1])
-
     try:
         product = buy_product(callback.from_user.id, product_id)
     except ValueError as error:
@@ -389,26 +437,82 @@ async def buy_callback(callback: CallbackQuery):
         return
 
     await callback.message.edit_text(
-        f"✅ Покупка успешна!\n\n"
-        f"Товар: {product['name']}\n"
-        f"Списано: {product['price']}\n"
-        f"Баланс: {get_balance(callback.from_user.id)}",
-        reply_markup=main_menu(),
+        f"✅ Покупка успешна!\n\nТовар: {product['name']}\nСписано: {product['price']}\nБаланс: {get_balance(callback.from_user.id)}",
+        reply_markup=main_menu(callback.from_user.id),
     )
-
     await callback.answer("Покупка успешна!")
+
+
+@router.callback_query(F.data == "admin")
+async def admin_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(admin_only_text(), show_alert=True)
+        return
+    await callback.message.edit_text("👑 Админка", reply_markup=admin_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_users")
+async def admin_users_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(admin_only_text(), show_alert=True)
+        return
+    await callback.message.edit_text(get_users_text(), reply_markup=admin_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_stats")
+async def admin_stats_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(admin_only_text(), show_alert=True)
+        return
+    await callback.message.edit_text(get_stats_text(), reply_markup=admin_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_transactions")
+async def admin_transactions_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(admin_only_text(), show_alert=True)
+        return
+    await callback.message.edit_text(get_transactions_text(), reply_markup=admin_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_add_balance")
+async def admin_add_balance_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(admin_only_text(), show_alert=True)
+        return
+    ADMIN_STATES[callback.from_user.id] = "add_balance"
+    await callback.message.edit_text(
+        "💰 Начисление баланса\n\nОтправь следующим сообщением:\nuser_id сумма\n\nНапример:\n123456789 500",
+        reply_markup=admin_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_remove_balance")
+async def admin_remove_balance_callback(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer(admin_only_text(), show_alert=True)
+        return
+    ADMIN_STATES[callback.from_user.id] = "remove_balance"
+    await callback.message.edit_text(
+        "➖ Списание баланса\n\nОтправь следующим сообщением:\nuser_id сумма\n\nНапример:\n123456789 100",
+        reply_markup=admin_keyboard(),
+    )
+    await callback.answer()
 
 
 async def main():
     token = os.getenv("BOT_TOKEN")
-
     if not token:
         raise RuntimeError("Не указан BOT_TOKEN в переменных окружения")
 
     bot = Bot(token=token)
     dp = Dispatcher()
     dp.include_router(router)
-
     await dp.start_polling(bot)
 
 
