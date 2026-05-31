@@ -8,7 +8,7 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -86,11 +86,9 @@ def generate_public_data() -> None:
         amount = int(tx.get("amount", 0) or 0)
         created_at = str(tx.get("created_at", ""))
         comment = str(tx.get("comment", ""))
-
         is_positive_reward = amount > 0 and "Списание" not in comment and "Покупка" not in comment
         if not is_positive_reward:
             continue
-
         received_total[user_id] += amount
         if created_at.startswith(current_month):
             received_month[user_id] += amount
@@ -108,11 +106,7 @@ def generate_public_data() -> None:
     top_month = []
     for user_id, amount in sorted(received_month.items(), key=lambda item: item[1], reverse=True)[:3]:
         user = users.get(user_id, {})
-        top_month.append({
-            "user_id": user_id,
-            "name": public_name(user),
-            "amount": amount,
-        })
+        top_month.append({"user_id": user_id, "name": public_name(user), "amount": amount})
 
     public_data = {
         "updated_at": now(),
@@ -121,11 +115,7 @@ def generate_public_data() -> None:
         "top_month": top_month,
         "users": public_users,
         "products": [product for product in products if product.get("active", True)],
-        "stats": {
-            "users_count": len(users),
-            "transactions_count": len(transactions),
-            "total_given_month": total_given_month,
-        },
+        "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month},
     }
     write_json(PUBLIC_DATA_FILE, public_data)
 
@@ -133,23 +123,13 @@ def generate_public_data() -> None:
 def save_user(user) -> dict:
     users = read_json(USERS_FILE, {})
     telegram_id = str(user.id)
-
     if telegram_id not in users:
-        users[telegram_id] = {
-            "telegram_id": user.id,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "balance": 0,
-            "created_at": now(),
-            "updated_at": now(),
-        }
+        users[telegram_id] = {"telegram_id": user.id, "username": user.username, "first_name": user.first_name, "last_name": user.last_name, "balance": 0, "created_at": now(), "updated_at": now()}
     else:
         users[telegram_id]["username"] = user.username
         users[telegram_id]["first_name"] = user.first_name
         users[telegram_id]["last_name"] = user.last_name
         users[telegram_id]["updated_at"] = now()
-
     write_json(USERS_FILE, users)
     generate_public_data()
     return users[telegram_id]
@@ -160,21 +140,12 @@ def save_chat(chat) -> None:
         return
     chats = read_json(CHATS_FILE, {})
     chat_id = str(chat.id)
-
     if chat_id not in chats:
-        chats[chat_id] = {
-            "chat_id": chat.id,
-            "title": chat.title,
-            "type": chat.type,
-            "members": [],
-            "created_at": now(),
-            "updated_at": now(),
-        }
+        chats[chat_id] = {"chat_id": chat.id, "title": chat.title, "type": chat.type, "members": [], "created_at": now(), "updated_at": now()}
     else:
         chats[chat_id]["title"] = chat.title
         chats[chat_id]["type"] = chat.type
         chats[chat_id]["updated_at"] = now()
-
     write_json(CHATS_FILE, chats)
 
 
@@ -184,27 +155,18 @@ def save_chat_member(chat, user) -> None:
     save_chat(chat)
     chats = read_json(CHATS_FILE, {})
     chat_id = str(chat.id)
-
     if chat_id not in chats:
         return
-
     members = chats[chat_id].setdefault("members", [])
     if user.id not in members:
         members.append(user.id)
-
     chats[chat_id]["updated_at"] = now()
     write_json(CHATS_FILE, chats)
 
 
 def add_transaction(user_id: int, amount: int, transaction_type: str, comment: str = "") -> None:
     transactions = read_json(TRANSACTIONS_FILE, [])
-    transactions.append({
-        "user_id": user_id,
-        "amount": amount,
-        "type": transaction_type,
-        "comment": comment,
-        "created_at": now(),
-    })
+    transactions.append({"user_id": user_id, "amount": amount, "type": transaction_type, "comment": comment, "created_at": now()})
     write_json(TRANSACTIONS_FILE, transactions)
     generate_public_data()
 
@@ -212,22 +174,11 @@ def add_transaction(user_id: int, amount: int, transaction_type: str, comment: s
 def change_balance(user_id: int, amount: int, comment: str = "") -> int:
     users = read_json(USERS_FILE, {})
     key = str(user_id)
-
     if key not in users:
-        users[key] = {
-            "telegram_id": user_id,
-            "username": None,
-            "first_name": None,
-            "last_name": None,
-            "balance": 0,
-            "created_at": now(),
-            "updated_at": now(),
-        }
-
+        users[key] = {"telegram_id": user_id, "username": None, "first_name": None, "last_name": None, "balance": 0, "created_at": now(), "updated_at": now()}
     new_balance = int(users[key].get("balance", 0)) + amount
     if new_balance < 0:
         raise ValueError("Недостаточно средств")
-
     users[key]["balance"] = new_balance
     users[key]["updated_at"] = now()
     write_json(USERS_FILE, users)
@@ -250,18 +201,16 @@ def buy_product(user_id: int, product_id: int) -> dict:
     product = next((item for item in get_products() if int(item["id"]) == product_id), None)
     if product is None:
         raise ValueError("Товар не найден")
-
     price = int(product["price"])
     if get_balance(user_id) < price:
         raise ValueError("Недостаточно средств")
-
     change_balance(user_id, -price, f"Покупка товара: {product['name']}")
     return product
 
 
 def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(text="🚀 Открыть приложение", web_app=WebAppInfo(url=MINI_APP_URL))],
+        [InlineKeyboardButton(text="🚀 Открыть приложение", url=MINI_APP_URL)],
         [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
         [InlineKeyboardButton(text="🛒 Магазин", callback_data="shop")],
         [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
@@ -306,14 +255,11 @@ def format_user_line(user: dict) -> str:
 def get_users_text(limit: int = 20) -> str:
     users = list(read_json(USERS_FILE, {}).values())
     users.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
-
     if not users:
         return "👥 Пользователей пока нет."
-
     text = f"👥 Пользователей в базе: {len(users)}\n\n"
     for user in users[:limit]:
         text += format_user_line(user) + "\n"
-
     if len(users) > limit:
         text += f"\nПоказаны последние {limit}."
     return text
@@ -327,30 +273,16 @@ def get_stats_text() -> str:
     chats = read_json(CHATS_FILE, {})
     public_data = read_json(PUBLIC_DATA_FILE, {})
     total_balance = sum(int(user.get("balance", 0)) for user in users.values())
-    return (
-        "📊 Статистика\n\n"
-        f"Пользователей: {len(users)}\n"
-        f"Чатов: {len(chats)}\n"
-        f"Товаров: {len(products)}\n"
-        f"Операций: {len(transactions)}\n"
-        f"Выдано за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n"
-        f"Общий баланс пользователей: {total_balance}"
-    )
+    return ("📊 Статистика\n\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Товаров: {len(products)}\n" f"Операций: {len(transactions)}\n" f"Выдано за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
 
 
 def get_transactions_text(limit: int = 10) -> str:
     transactions = read_json(TRANSACTIONS_FILE, [])
     if not transactions:
         return "🧾 Операций пока нет."
-
     text = "🧾 Последние операции:\n\n"
     for item in transactions[-limit:][::-1]:
-        text += (
-            f"user_id: {item.get('user_id')}\n"
-            f"сумма: {item.get('amount')}\n"
-            f"тип: {item.get('type')}\n"
-            f"комментарий: {item.get('comment', '')}\n\n"
-        )
+        text += f"user_id: {item.get('user_id')}\nсумма: {item.get('amount')}\nтип: {item.get('type')}\nкомментарий: {item.get('comment', '')}\n\n"
     return text
 
 
@@ -393,32 +325,27 @@ async def add_balance_handler(message: Message):
         await message.answer("Использование:\n/add_balance user_id amount")
         return
     try:
-        user_id = int(parts[1])
-        amount = int(parts[2])
+        user_id = int(parts[1]); amount = int(parts[2])
     except ValueError:
-        await message.answer("user_id и amount должны быть числами.")
-        return
+        await message.answer("user_id и amount должны быть числами."); return
     try:
         new_balance = change_balance(user_id, amount, f"Начисление спасибок админом {message.from_user.id}")
     except ValueError as error:
-        await message.answer(str(error))
-        return
+        await message.answer(str(error)); return
     await message.answer(f"✅ Пользователь {user_id} получил {amount} спасибок.\nНовый баланс: {new_balance}")
 
 
 @router.message(Command("users"))
 async def users_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer("⛔ У тебя нет доступа к этой команде.")
-        return
+        await message.answer("⛔ У тебя нет доступа к этой команде."); return
     await message.answer(get_users_text())
 
 
 @router.message(Command("sync"))
 async def sync_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer("⛔ У тебя нет доступа к этой команде.")
-        return
+        await message.answer("⛔ У тебя нет доступа к этой команде."); return
     generate_public_data()
     await message.answer("✅ Данные Mini App обновлены.")
 
@@ -435,44 +362,35 @@ async def collect_user_handler(message: Message):
         return
     parts = message.text.split()
     if len(parts) != 2:
-        await message.answer("Нужно отправить так:\nuser_id сумма\n\nНапример:\n123456789 500")
-        return
+        await message.answer("Нужно отправить так:\nuser_id сумма\n\nНапример:\n123456789 500"); return
     try:
-        user_id = int(parts[0])
-        amount = int(parts[1])
+        user_id = int(parts[0]); amount = int(parts[1])
     except ValueError:
-        await message.answer("user_id и сумма должны быть числами.")
-        return
+        await message.answer("user_id и сумма должны быть числами."); return
     if amount <= 0:
-        await message.answer("Сумма должна быть больше 0.")
-        return
+        await message.answer("Сумма должна быть больше 0."); return
     if state == "add_balance":
-        real_amount = amount
-        comment = f"Начисление спасибок через админку админом {message.from_user.id}"
+        real_amount = amount; comment = f"Начисление спасибок через админку админом {message.from_user.id}"
     else:
-        real_amount = -amount
-        comment = f"Списание спасибок через админку админом {message.from_user.id}"
+        real_amount = -amount; comment = f"Списание спасибок через админку админом {message.from_user.id}"
     try:
         new_balance = change_balance(user_id, real_amount, comment)
     except ValueError as error:
-        await message.answer(str(error))
-        return
+        await message.answer(str(error)); return
     ADMIN_STATES.pop(message.from_user.id, None)
     await message.answer(f"✅ Готово.\nПользователь: {user_id}\nИзменение: {real_amount}\nНовый баланс: {new_balance}", reply_markup=admin_keyboard())
 
 
 @router.callback_query(F.data == "menu")
 async def menu_callback(callback: CallbackQuery):
-    await callback.message.edit_text("Главное меню:", reply_markup=main_menu(callback.from_user.id))
-    await callback.answer()
+    await callback.message.edit_text("Главное меню:", reply_markup=main_menu(callback.from_user.id)); await callback.answer()
 
 
 @router.callback_query(F.data == "balance")
 async def balance_callback(callback: CallbackQuery):
     save_user(callback.from_user)
     balance = get_balance(callback.from_user.id)
-    await callback.message.edit_text(f"💰 Твои спасибки: {balance}", reply_markup=main_menu(callback.from_user.id))
-    await callback.answer()
+    await callback.message.edit_text(f"💰 Твои спасибки: {balance}", reply_markup=main_menu(callback.from_user.id)); await callback.answer()
 
 
 @router.callback_query(F.data == "shop")
@@ -490,19 +408,7 @@ async def shop_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data == "help")
 async def help_callback(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "ℹ️ Помощь\n\n"
-        "🚀 Открыть приложение — Mini App со статистикой.\n"
-        "💰 Баланс — проверить спасибки.\n"
-        "🛒 Магазин — посмотреть призы.\n\n"
-        "Админ-команды:\n"
-        "/admin — открыть админку\n"
-        "/add_balance user_id amount — начислить спасибки\n"
-        "/users — список пользователей\n"
-        "/sync — обновить данные Mini App",
-        reply_markup=main_menu(callback.from_user.id),
-    )
-    await callback.answer()
+    await callback.message.edit_text("ℹ️ Помощь\n\n🚀 Открыть приложение — Mini App со статистикой.\n💰 Баланс — проверить спасибки.\n🛒 Магазин — посмотреть призы.\n\nАдмин-команды:\n/admin — открыть админку\n/add_balance user_id amount — начислить спасибки\n/users — список пользователей\n/sync — обновить данные Mini App", reply_markup=main_menu(callback.from_user.id)); await callback.answer()
 
 
 @router.callback_query(F.data.startswith("buy:"))
@@ -511,8 +417,7 @@ async def buy_callback(callback: CallbackQuery):
     try:
         product = buy_product(callback.from_user.id, product_id)
     except ValueError as error:
-        await callback.answer(str(error), show_alert=True)
-        return
+        await callback.answer(str(error), show_alert=True); return
     await callback.message.edit_text(f"✅ Покупка успешна!\n\nТовар: {product['name']}\nСписано: {product['price']}\nБаланс: {get_balance(callback.from_user.id)}", reply_markup=main_menu(callback.from_user.id))
     await callback.answer("Покупка успешна!")
 
@@ -520,57 +425,45 @@ async def buy_callback(callback: CallbackQuery):
 @router.callback_query(F.data == "admin")
 async def admin_callback(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
-        await callback.answer(admin_only_text(), show_alert=True)
-        return
-    await callback.message.edit_text("👑 Админка", reply_markup=admin_keyboard())
-    await callback.answer()
+        await callback.answer(admin_only_text(), show_alert=True); return
+    await callback.message.edit_text("👑 Админка", reply_markup=admin_keyboard()); await callback.answer()
 
 
 @router.callback_query(F.data == "admin_users")
 async def admin_users_callback(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
-        await callback.answer(admin_only_text(), show_alert=True)
-        return
-    await callback.message.edit_text(get_users_text(), reply_markup=admin_keyboard())
-    await callback.answer()
+        await callback.answer(admin_only_text(), show_alert=True); return
+    await callback.message.edit_text(get_users_text(), reply_markup=admin_keyboard()); await callback.answer()
 
 
 @router.callback_query(F.data == "admin_stats")
 async def admin_stats_callback(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
-        await callback.answer(admin_only_text(), show_alert=True)
-        return
-    await callback.message.edit_text(get_stats_text(), reply_markup=admin_keyboard())
-    await callback.answer()
+        await callback.answer(admin_only_text(), show_alert=True); return
+    await callback.message.edit_text(get_stats_text(), reply_markup=admin_keyboard()); await callback.answer()
 
 
 @router.callback_query(F.data == "admin_transactions")
 async def admin_transactions_callback(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
-        await callback.answer(admin_only_text(), show_alert=True)
-        return
-    await callback.message.edit_text(get_transactions_text(), reply_markup=admin_keyboard())
-    await callback.answer()
+        await callback.answer(admin_only_text(), show_alert=True); return
+    await callback.message.edit_text(get_transactions_text(), reply_markup=admin_keyboard()); await callback.answer()
 
 
 @router.callback_query(F.data == "admin_add_balance")
 async def admin_add_balance_callback(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
-        await callback.answer(admin_only_text(), show_alert=True)
-        return
+        await callback.answer(admin_only_text(), show_alert=True); return
     ADMIN_STATES[callback.from_user.id] = "add_balance"
-    await callback.message.edit_text("💰 Начисление спасибок\n\nОтправь следующим сообщением:\nuser_id сумма\n\nНапример:\n123456789 500", reply_markup=admin_keyboard())
-    await callback.answer()
+    await callback.message.edit_text("💰 Начисление спасибок\n\nОтправь следующим сообщением:\nuser_id сумма\n\nНапример:\n123456789 500", reply_markup=admin_keyboard()); await callback.answer()
 
 
 @router.callback_query(F.data == "admin_remove_balance")
 async def admin_remove_balance_callback(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
-        await callback.answer(admin_only_text(), show_alert=True)
-        return
+        await callback.answer(admin_only_text(), show_alert=True); return
     ADMIN_STATES[callback.from_user.id] = "remove_balance"
-    await callback.message.edit_text("➖ Списание спасибок\n\nОтправь следующим сообщением:\nuser_id сумма\n\nНапример:\n123456789 100", reply_markup=admin_keyboard())
-    await callback.answer()
+    await callback.message.edit_text("➖ Списание спасибок\n\nОтправь следующим сообщением:\nuser_id сумма\n\nНапример:\n123456789 100", reply_markup=admin_keyboard()); await callback.answer()
 
 
 async def main():
