@@ -1,0 +1,20 @@
+{
+  "updated_at": "2026-05-31T00:00:00",
+  "currency_name": "спасибки",
+  "top_month": [],
+  "users": {},
+  "products": [
+    {
+      "id": 1,
+      "name": "Тестовый товар",
+      "description": "Описание тестового товара",
+      "price": 100,
+      "active": true
+    }
+  ],
+  "stats": {
+    "users_count": 0,
+    "transactions_count": 0,
+    "total_given_month": 0
+  }
+}
