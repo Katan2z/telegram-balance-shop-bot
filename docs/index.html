@@ -11,9 +11,9 @@
   <main class="app">
     <section class="hero">
       <div class="hero-copy">
-        <p class="label">Командная мотивация ресторана</p>
+        <p class="label">Командная мотивация</p>
         <h1><span>Мои</span> Спасибки</h1>
-        <p id="userName" class="muted">Загрузка пользователя...</p>
+        <p id="userName" class="muted">Загрузка...</p>
         <div class="hero-badges">
           <span>🍔 смена</span>
           <span>🔥 скорость</span>
@@ -21,7 +21,7 @@
         </div>
       </div>
       <div class="balance-card">
-        <span>Мой баланс</span>
+        <span>Баланс</span>
         <strong id="balance">0</strong>
         <small>спасибок</small>
       </div>
@@ -31,14 +31,9 @@
       <button class="tab active" data-tab="home">Главная</button>
       <button class="tab" data-tab="rating">Рейтинг</button>
       <button class="tab" data-tab="shop">Магазин</button>
-      <button class="tab" data-tab="admin">Админ</button>
     </nav>
 
     <section class="tab-page active" id="tab-home">
-      <div class="promo-strip">
-        <strong>Собирай спасибки</strong>
-        <span>Стань героем месяца и забери приз</span>
-      </div>
       <div class="grid">
         <article class="card stats-card">
           <h2>📊 Моя статистика</h2>
@@ -61,15 +56,7 @@
     <section class="tab-page" id="tab-shop">
       <article class="card shop-card">
         <h2>🎁 Магазин призов</h2>
-        <p class="section-note">Обменивай спасибки на приятные бонусы. Чем активнее смена — тем ближе приз.</p>
         <div id="products" class="products"></div>
-      </article>
-    </section>
-
-    <section class="tab-page" id="tab-admin">
-      <article class="card admin-only" id="adminBlock">
-        <h2>👑 Админ-статистика</h2>
-        <div id="adminStats" class="list"></div>
       </article>
     </section>
   </main>
