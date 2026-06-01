@@ -37,11 +37,16 @@ jobs:
           ADMIN_IDS: ${{ secrets.ADMIN_IDS }}
         run: python bot.py
 
+      - name: Build public mini app data
+        if: always()
+        run: python sync_data.py
+
       - name: Save changed data
         if: always()
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add data/*.json
+          git add data/*.json docs/public-data.json
           git diff --cached --quiet || git commit -m "Update bot data"
+          git pull --rebase || true
           git push || true
