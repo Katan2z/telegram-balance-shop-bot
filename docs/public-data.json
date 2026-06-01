@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-01T21:49:58.992723",
+  "updated_at": "2026-06-01T23:59:49.590566",
   "currency_name": "спасибки",
   "month": "2026-06",
   "top_month": [
@@ -23,7 +23,7 @@
     },
     "5311640125": {
       "name": "Matvei",
-      "balance": 25,
+      "balance": 0,
       "received_month": 25,
       "received_total": 25
     }
@@ -39,7 +39,7 @@
   ],
   "stats": {
     "users_count": 2,
-    "transactions_count": 2,
+    "transactions_count": 3,
     "total_given_month": 25
   }
 }
