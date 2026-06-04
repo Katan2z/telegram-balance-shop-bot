@@ -1,4 +1,3 @@
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -13,7 +12,7 @@ PATHS_TO_SYNC = [
 
 
 def github_available() -> bool:
-    return bool(os.getenv("GITHUB_TOKEN"))
+    return Path(".git").exists()
 
 
 def run_git(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -36,6 +35,7 @@ def sync_files_to_github(message: str = "Update bot data") -> None:
     run_git(["config", "user.name", "github-actions"])
     run_git(["config", "user.email", "github-actions@github.com"])
 
+    last_error = ""
     for attempt in range(3):
         run_git(["add", *existing_paths])
         diff = run_git(["diff", "--cached", "--quiet"], check=False)
@@ -43,19 +43,23 @@ def sync_files_to_github(message: str = "Update bot data") -> None:
             return
 
         commit = run_git(["commit", "-m", message], check=False)
-        if commit.returncode != 0 and "nothing to commit" not in (commit.stdout + commit.stderr).lower():
+        commit_output = (commit.stdout + commit.stderr).lower()
+        if commit.returncode != 0 and "nothing to commit" not in commit_output:
             raise RuntimeError(commit.stderr or commit.stdout)
-
-        pull = run_git(["pull", "--rebase"], check=False)
-        if pull.returncode != 0:
-            run_git(["rebase", "--abort"], check=False)
-            run_git(["pull", "--no-rebase", "--strategy-option=ours"], check=False)
 
         push = run_git(["push"], check=False)
         if push.returncode == 0:
             return
 
+        last_error = push.stderr or push.stdout
+        pull = run_git(["pull", "--rebase"], check=False)
+        if pull.returncode != 0:
+            run_git(["rebase", "--abort"], check=False)
+            last_error = pull.stderr or pull.stdout
+            break
+
         if attempt < 2:
             time.sleep(1.2 * (attempt + 1))
             continue
-        raise RuntimeError(push.stderr or push.stdout)
+
+    raise RuntimeError(last_error or "Git push failed")
