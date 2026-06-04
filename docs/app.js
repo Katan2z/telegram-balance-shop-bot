@@ -20,6 +20,17 @@ function htmlEscape(value) {
     .replaceAll("'", "&#039;");
 }
 
+function initials(name) {
+  const text = String(name || "Сотрудник").trim();
+  const parts = text.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return text.slice(0, 2).toUpperCase();
+}
+
+function avatar(name, className = "") {
+  return `<div class="avatar ${className}">${htmlEscape(initials(name))}</div>`;
+}
+
 function switchTab(tabName) {
   document.querySelectorAll(".tab").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tabName));
   document.querySelectorAll(".tab-page").forEach(page => page.classList.toggle("active", page.id === `tab-${tabName}`));
@@ -45,15 +56,16 @@ function getUserRank(data, currentUserId) {
 function renderTop(items) {
   const root = document.getElementById("topMonth");
   if (!items || items.length === 0) {
-    root.innerHTML = `<p>Рейтинг пока пуст.</p>`;
+    root.innerHTML = `<p>Рейтинг пока пуст. Начисли первые спасибки — и тут появятся герои смены.</p>`;
     return;
   }
   root.innerHTML = items.slice(0, 3).map((item, index) => `
     <div class="rank rank-${index + 1}">
       <div class="rank-medal">${medal[index] || "🏅"}</div>
+      ${avatar(item.name)}
       <div>
         <strong>${htmlEscape(item.name || "Сотрудник")}</strong>
-        <span>${Number(item.amount || 0)} спасибок</span>
+        <span>${Number(item.amount || 0)} спасибок за месяц</span>
       </div>
     </div>
   `).join("");
@@ -63,15 +75,16 @@ function renderHero(items) {
   const root = document.getElementById("heroMonth");
   const hero = items?.[0];
   if (!hero) {
-    root.innerHTML = `<p>Пока не определён.</p>`;
+    root.innerHTML = `<p>Пока не определён. Герой появится после первого начисления.</p>`;
     return;
   }
+  const amount = Number(hero.amount || 0);
   root.innerHTML = `
     <div class="hero-person">
-      <div class="hero-avatar">👑</div>
+      ${avatar(hero.name, "hero-avatar")}
       <strong>${htmlEscape(hero.name || "Сотрудник")}</strong>
-      <span>${Number(hero.amount || 0)} спасибок</span>
-      <div class="progress"><i style="width:${Math.min(100, Number(hero.amount || 0))}%"></i></div>
+      <span>👑 ${amount} спасибок за месяц</span>
+      <div class="progress"><i style="width:${Math.min(100, Math.max(8, amount))}%"></i></div>
     </div>
   `;
 }
@@ -80,16 +93,21 @@ function renderMyStats(data) {
   const root = document.getElementById("myStats");
   const publicUser = userId ? data.users?.[userId] : null;
   if (!userId || !publicUser) {
-    root.innerHTML = `<p>Нет данных.</p>`;
+    root.innerHTML = `<p>Нет данных. Открой приложение через Telegram и нажми /start у бота.</p>`;
     return;
   }
   const rank = getUserRank(data, userId);
-  setText("balance", Number(publicUser.balance || 0));
+  const balance = Number(publicUser.balance || 0);
+  const month = Number(publicUser.received_month || 0);
+  const total = Number(publicUser.received_total || 0);
+  setText("balance", balance);
   root.innerHTML = `
-    <div class="stat-row"><strong>${Number(publicUser.received_month || 0)}</strong><span>за месяц</span></div>
-    <div class="stat-row"><strong>${Number(publicUser.received_total || 0)}</strong><span>за всё время</span></div>
-    <div class="stat-row"><strong>${rank ? `#${rank}` : "—"}</strong><span>место</span></div>
-    <div class="stat-row"><strong>${Number(publicUser.balance || 0)}</strong><span>баланс</span></div>
+    <div class="stat-grid">
+      <div class="stat-tile"><small>Баланс</small><strong>${balance}</strong><span>доступно</span></div>
+      <div class="stat-tile"><small>Место</small><strong>${rank ? `#${rank}` : "—"}</strong><span>в рейтинге</span></div>
+      <div class="stat-tile"><small>За месяц</small><strong>${month}</strong><span>получено</span></div>
+      <div class="stat-tile"><small>Всего</small><strong>${total}</strong><span>за всё время</span></div>
+    </div>
   `;
 }
 
@@ -108,7 +126,7 @@ function setupAdmin(data) {
 
   const select = document.getElementById("adminUser");
   select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
-    const label = `${item.name || "Сотрудник"} · ${item.balance || 0}`;
+    const label = `${item.name || "Сотрудник"} · баланс ${item.balance || 0}`;
     return `<option value="${htmlEscape(id)}">${htmlEscape(label)}</option>`;
   }).join("");
 
