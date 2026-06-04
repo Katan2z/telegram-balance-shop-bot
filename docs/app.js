@@ -46,6 +46,12 @@ function switchTab(tabName) {
 
 document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
+function userNameFromRow(row) {
+  if (row.first_name) return row.first_name;
+  if (row.username) return `@${row.username}`;
+  return "Сотрудник";
+}
+
 function normalizeData(data) {
   data.users = data.users || {};
   data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ADMIN_IDS]));
@@ -58,13 +64,40 @@ function normalizeData(data) {
   return data;
 }
 
+async function loadSupabaseData() {
+  const config = window.APP_CONFIG || {};
+  const url = String(config.SUPABASE_URL || "").replace(/\/$/, "");
+  const key = config.SUPABASE_ANON_KEY || "";
+  if (!url || !key) throw new Error("Supabase config missing");
+
+  const response = await fetch(`${url}/rest/v1/users?select=telegram_id,username,first_name,last_name,balance,updated_at&order=balance.desc`, {
+    cache: "no-store",
+    headers: {
+      "apikey": key,
+      "Authorization": `Bearer ${key}`,
+    },
+  });
+  if (!response.ok) throw new Error("Supabase users unavailable");
+  const rows = await response.json();
+  const users = {};
+  for (const row of rows) {
+    const id = String(row.telegram_id);
+    const balance = Number(row.balance || 0);
+    users[id] = {
+      name: userNameFromRow(row),
+      balance,
+      received_month: balance,
+      received_total: balance,
+    };
+  }
+  return normalizeData({ users, admin_ids: ADMIN_IDS, root_admin_ids: ADMIN_IDS, top_month: [] });
+}
+
 async function loadData() {
   try {
+    return await loadSupabaseData();
+  } catch (supabaseError) {
     const response = await fetch(`${RAW_DATA_URL}?v=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error("Raw data unavailable");
-    return normalizeData(await response.json());
-  } catch (error) {
-    const response = await fetch(`public-data.json?v=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error("Данные временно недоступны");
     return normalizeData(await response.json());
   }
@@ -190,7 +223,7 @@ async function main() {
   setText("userName", user ? `${user.first_name}` : "Спасибки");
   try {
     await refreshData();
-    setInterval(() => refreshData().catch(() => {}), 10000);
+    setInterval(() => refreshData().catch(() => {}), 5000);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) refreshData().catch(() => {});
     });
