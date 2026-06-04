@@ -11,6 +11,7 @@ from aiogram.exceptions import TelegramNetworkError
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+import supabase_storage as db
 from storage import sync_files_to_github
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -24,11 +25,7 @@ CHATS_FILE = DATA_DIR / "chats.json"
 PUBLIC_DATA_FILE = DOCS_DIR / "public-data.json"
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
-
-# Стабильный список админов после отката менеджерки.
-# Эти ID добавлены сюда, чтобы не зависеть от сломанной динамической схемы admins.json.
 DEFAULT_ADMIN_IDS = {818748106, 747818163, 5311640125}
-
 ADMIN_STATES: dict[int, str] = {}
 
 
@@ -50,23 +47,6 @@ def write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
-
-
-def persist_data(message: str = "Update bot data") -> bool:
-    generate_public_data()
-    try:
-        sync_files_to_github(message)
-        return True
-    except Exception as error:
-        print(f"GitHub sync failed: {error}")
-        return False
-
-
-async def safe_answer(message: Message, text: str, **kwargs) -> None:
-    try:
-        await message.answer(text, **kwargs)
-    except TelegramNetworkError as error:
-        print(f"Telegram answer timeout/error: {error}")
 
 
 def get_admin_ids() -> set[int]:
@@ -97,80 +77,106 @@ def month_key(date_text: str | None = None) -> str:
 
 
 def generate_public_data() -> None:
+    if db.enabled():
+        users_list = db.list_users()
+        public_users = {}
+        for user in users_list:
+            user_id = str(user.get("telegram_id"))
+            name = user.get("first_name") or ("@" + user["username"] if user.get("username") else "Сотрудник")
+            balance = int(user.get("balance", 0) or 0)
+            public_users[user_id] = {
+                "name": name,
+                "balance": balance,
+                "received_month": balance,
+                "received_total": balance,
+            }
+        top_month = [
+            {"user_id": user_id, "name": item["name"], "amount": item["balance"]}
+            for user_id, item in public_users.items()
+            if int(item["balance"]) > 0
+        ]
+        top_month.sort(key=lambda item: item["amount"], reverse=True)
+        stats = db.get_stats()
+        admin_ids = sorted(get_admin_ids())
+        write_json(PUBLIC_DATA_FILE, {
+            "updated_at": now(),
+            "currency_name": "спасибки",
+            "month": month_key(),
+            "top_month": top_month[:3],
+            "users": public_users,
+            "admin_ids": [str(admin_id) for admin_id in admin_ids],
+            "root_admin_ids": [str(admin_id) for admin_id in admin_ids],
+            "extra_admin_ids": [],
+            "products": [],
+            "stats": stats,
+        })
+        return
+
     users = read_json(USERS_FILE, {})
     products = read_json(PRODUCTS_FILE, [])
     transactions = read_json(TRANSACTIONS_FILE, [])
     current_month = month_key()
-
     rating_total = defaultdict(int)
-    rating_month = defaultdict(int)
-
     for tx in transactions:
         user_id = str(tx.get("user_id"))
         amount = int(tx.get("amount", 0) or 0)
-        created_at = str(tx.get("created_at", ""))
         comment = str(tx.get("comment", ""))
         if "Покупка" in comment:
             continue
         rating_total[user_id] += amount
-        if created_at.startswith(current_month):
-            rating_month[user_id] += amount
 
     public_users = {}
     for user_id, user in users.items():
         balance = int(user.get("balance", 0) or 0)
-        public_users[user_id] = {
-            "name": public_name(user),
-            "balance": balance,
-            "received_month": balance,
-            "received_total": rating_total[user_id],
-        }
+        public_users[user_id] = {"name": public_name(user), "balance": balance, "received_month": balance, "received_total": rating_total[user_id]}
 
     top_month = [
-        {
-            "user_id": user_id,
-            "name": public_name(users.get(user_id, {})),
-            "amount": int(user.get("balance", 0) or 0),
-        }
+        {"user_id": user_id, "name": public_name(users.get(user_id, {})), "amount": int(user.get("balance", 0) or 0)}
         for user_id, user in users.items()
         if int(user.get("balance", 0) or 0) > 0
     ]
     top_month.sort(key=lambda item: item["amount"], reverse=True)
-    top_month = top_month[:3]
-
     admin_ids = sorted(get_admin_ids())
-    public_data = {
+    write_json(PUBLIC_DATA_FILE, {
         "updated_at": now(),
         "currency_name": "спасибки",
         "month": current_month,
-        "top_month": top_month,
+        "top_month": top_month[:3],
         "users": public_users,
         "admin_ids": [str(admin_id) for admin_id in admin_ids],
         "root_admin_ids": [str(admin_id) for admin_id in admin_ids],
         "extra_admin_ids": [],
         "products": [product for product in products if product.get("active", True)],
-        "stats": {
-            "users_count": len(users),
-            "transactions_count": len(transactions),
-            "total_given_month": sum(item["amount"] for item in top_month),
-        },
-    }
-    write_json(PUBLIC_DATA_FILE, public_data)
+        "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": sum(item["amount"] for item in top_month[:3])},
+    })
+
+
+def persist_data(message: str = "Update bot data") -> bool:
+    generate_public_data()
+    if db.enabled():
+        return True
+    try:
+        sync_files_to_github(message)
+        return True
+    except Exception as error:
+        print(f"GitHub sync failed: {error}")
+        return False
+
+
+async def safe_answer(message: Message, text: str, **kwargs) -> None:
+    try:
+        await message.answer(text, **kwargs)
+    except TelegramNetworkError as error:
+        print(f"Telegram answer timeout/error: {error}")
 
 
 def save_user(user) -> dict:
+    if db.enabled():
+        return db.upsert_user(user)
     users = read_json(USERS_FILE, {})
     telegram_id = str(user.id)
     if telegram_id not in users:
-        users[telegram_id] = {
-            "telegram_id": user.id,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "balance": 0,
-            "created_at": now(),
-            "updated_at": now(),
-        }
+        users[telegram_id] = {"telegram_id": user.id, "username": user.username, "first_name": user.first_name, "last_name": user.last_name, "balance": 0, "created_at": now(), "updated_at": now()}
     else:
         users[telegram_id]["username"] = user.username
         users[telegram_id]["first_name"] = user.first_name
@@ -183,6 +189,9 @@ def save_user(user) -> dict:
 
 def save_chat(chat) -> None:
     if chat.type == "private":
+        return
+    if db.enabled():
+        db.save_chat(chat)
         return
     chats = read_json(CHATS_FILE, {})
     chat_id = str(chat.id)
@@ -199,6 +208,8 @@ def save_chat_member(chat, user) -> None:
     if chat.type == "private" or user.is_bot:
         return
     save_chat(chat)
+    if db.enabled():
+        return
     chats = read_json(CHATS_FILE, {})
     chat_id = str(chat.id)
     if chat_id not in chats:
@@ -217,7 +228,10 @@ def add_transaction(user_id: int, amount: int, transaction_type: str, comment: s
     write_json(TRANSACTIONS_FILE, transactions)
 
 
-def change_balance(user_id: int, amount: int, comment: str = "") -> tuple[int, bool]:
+def change_balance(user_id: int, amount: int, comment: str = "", admin_id: int | None = None) -> tuple[int, bool]:
+    if db.enabled():
+        new_balance = db.change_balance(user_id, amount, admin_id=admin_id, comment=comment)
+        return new_balance, True
     users = read_json(USERS_FILE, {})
     key = str(user_id)
     if key not in users:
@@ -234,11 +248,15 @@ def change_balance(user_id: int, amount: int, comment: str = "") -> tuple[int, b
 
 
 def get_balance(user_id: int) -> int:
+    if db.enabled():
+        return db.get_balance(user_id)
     users = read_json(USERS_FILE, {})
     return int(users.get(str(user_id), {}).get("balance", 0))
 
 
 def get_user_display_name(user_id: int) -> str:
+    if db.enabled():
+        return db.get_user_name(user_id)
     users = read_json(USERS_FILE, {})
     user = users.get(str(user_id), {})
     return public_name(user)
@@ -249,11 +267,7 @@ def bot_private_url(payload: str = "app") -> str:
 
 
 def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
-    buttons = [
-        [InlineKeyboardButton(text="🚀 Открыть приложение", url=bot_private_url())],
-        [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
-        [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
-    ]
+    buttons = [[InlineKeyboardButton(text="🚀 Открыть приложение", url=bot_private_url())], [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")], [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")]]
     if user_id and is_admin(user_id):
         buttons.append([InlineKeyboardButton(text="👑 Админка", callback_data="admin")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -264,21 +278,11 @@ def app_keyboard() -> InlineKeyboardMarkup:
 
 
 def admin_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users")],
-        [InlineKeyboardButton(text="💰 Начислить спасибки", callback_data="admin_add_balance")],
-        [InlineKeyboardButton(text="➖ Списать спасибки", callback_data="admin_remove_balance")],
-        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="🧾 Последние операции", callback_data="admin_transactions")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")],
-    ])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users")], [InlineKeyboardButton(text="💰 Начислить спасибки", callback_data="admin_add_balance")], [InlineKeyboardButton(text="➖ Списать спасибки", callback_data="admin_remove_balance")], [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")], [InlineKeyboardButton(text="🧾 Последние операции", callback_data="admin_transactions")], [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")]])
 
 
 def admin_done_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="↩️ Вернуться в бота", url=bot_private_url())],
-        [InlineKeyboardButton(text="👑 Админка в боте", callback_data="admin")],
-    ])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="↩️ Вернуться в бота", url=bot_private_url())], [InlineKeyboardButton(text="👑 Админка в боте", callback_data="admin")]])
 
 
 def admin_only_text() -> str:
@@ -295,8 +299,7 @@ def format_user_line(user: dict) -> str:
 
 
 def get_users_text(limit: int = 20) -> str:
-    users = list(read_json(USERS_FILE, {}).values())
-    users.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+    users = db.list_users() if db.enabled() else list(read_json(USERS_FILE, {}).values())
     if not users:
         return "👥 Пользователей пока нет."
     text = f"👥 Пользователей в базе: {len(users)}\n\n"
@@ -308,6 +311,9 @@ def get_users_text(limit: int = 20) -> str:
 
 
 def get_stats_text() -> str:
+    if db.enabled():
+        stats = db.get_stats()
+        return f"📊 Статистика\n\nСтатус: ✅ Supabase подключён\nПользователей: {stats['users_count']}\nЧатов: {stats['chats_count']}\nОпераций: {stats['transactions_count']}\nОбщий баланс пользователей: {stats['total_balance']}"
     synced = persist_data("Manual statistics sync")
     users = read_json(USERS_FILE, {})
     transactions = read_json(TRANSACTIONS_FILE, [])
@@ -318,11 +324,11 @@ def get_stats_text() -> str:
 
 
 def get_transactions_text(limit: int = 10) -> str:
-    transactions = read_json(TRANSACTIONS_FILE, [])
+    transactions = db.list_transactions(limit) if db.enabled() else read_json(TRANSACTIONS_FILE, [])[-limit:][::-1]
     if not transactions:
         return "🧾 Операций пока нет."
     text = "🧾 Последние операции:\n\n"
-    for item in transactions[-limit:][::-1]:
+    for item in transactions:
         text += f"user_id: {item.get('user_id')}\nсумма: {item.get('amount')}\nтип: {item.get('type')}\nкомментарий: {item.get('comment', '')}\n\n"
     return text
 
@@ -346,21 +352,13 @@ async def handle_start_payload(message: Message, payload: str) -> bool:
     except ValueError:
         await safe_answer(message, "Неверные данные начисления.")
         return True
-    if amount == 0:
-        await safe_answer(message, "Сумма не может быть 0.")
-        return True
     try:
-        new_balance, synced = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
+        new_balance, synced = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}", admin_id=message.from_user.id)
     except ValueError as error:
         await safe_answer(message, str(error))
         return True
-    target_name = get_user_display_name(target_user_id)
     action = "начислено" if amount > 0 else "списано"
-    await safe_answer(
-        message,
-        f"✅ Операция выполнена\n\n👤 Сотрудник: {target_name}\n💰 {action.capitalize()}: {abs(amount)} спасибок\n🧾 Новый баланс: {new_balance}\n🔄 Синхронизация: {'готово' if synced else 'ошибка GitHub sync'}",
-        reply_markup=admin_done_keyboard(),
-    )
+    await safe_answer(message, f"✅ Операция выполнена\n\n👤 Сотрудник: {get_user_display_name(target_user_id)}\n💰 {action.capitalize()}: {abs(amount)} спасибок\n🧾 Новый баланс: {new_balance}\n🔄 Хранилище: {'Supabase' if db.enabled() else ('GitHub готово' if synced else 'ошибка GitHub sync')}", reply_markup=admin_done_keyboard())
     return True
 
 
@@ -416,15 +414,11 @@ async def add_balance_handler(message: Message):
     try:
         user_id = int(parts[1])
         amount = int(parts[2])
-    except ValueError:
-        await safe_answer(message, "user_id и amount должны быть числами.")
-        return
-    try:
-        new_balance, synced = change_balance(user_id, amount, f"Начисление спасибок админом {message.from_user.id}")
+        new_balance, synced = change_balance(user_id, amount, f"Начисление спасибок админом {message.from_user.id}", admin_id=message.from_user.id)
     except ValueError as error:
         await safe_answer(message, str(error))
         return
-    await safe_answer(message, f"✅ Пользователь {user_id} получил {amount} спасибок.\nНовый баланс: {new_balance}\nСинхронизация: {'готово' if synced else 'ошибка GitHub sync'}")
+    await safe_answer(message, f"✅ Пользователь {user_id} получил {amount} спасибок.\nНовый баланс: {new_balance}\nХранилище: {'Supabase' if db.enabled() else ('GitHub готово' if synced else 'ошибка GitHub sync')}")
 
 
 @router.message(Command("users"))
@@ -441,7 +435,7 @@ async def sync_handler(message: Message):
         await safe_answer(message, "⛔ У тебя нет доступа к этой команде.")
         return
     synced = persist_data("Manual data sync")
-    await safe_answer(message, "✅ Данные Mini App обновлены." if synced else "⚠️ Данные пересобраны локально, но GitHub sync не прошёл. Смотри логи Actions.")
+    await safe_answer(message, "✅ Данные Mini App обновлены." if synced else "⚠️ Данные пересобраны локально, но GitHub sync не прошёл.")
 
 
 @router.message()
@@ -470,12 +464,12 @@ async def collect_user_handler(message: Message):
     real_amount = amount if state == "add_balance" else -amount
     comment = f"{'Начисление' if real_amount > 0 else 'Списание'} спасибок через админку админом {message.from_user.id}"
     try:
-        new_balance, synced = change_balance(user_id, real_amount, comment)
+        new_balance, synced = change_balance(user_id, real_amount, comment, admin_id=message.from_user.id)
     except ValueError as error:
         await safe_answer(message, str(error))
         return
     ADMIN_STATES.pop(message.from_user.id, None)
-    await safe_answer(message, f"✅ Готово.\nПользователь: {user_id}\nИзменение: {real_amount}\nНовый баланс: {new_balance}\nСинхронизация: {'готово' if synced else 'ошибка GitHub sync'}", reply_markup=admin_keyboard())
+    await safe_answer(message, f"✅ Готово.\nПользователь: {user_id}\nИзменение: {real_amount}\nНовый баланс: {new_balance}\nХранилище: {'Supabase' if db.enabled() else ('GitHub готово' if synced else 'ошибка GitHub sync')}", reply_markup=admin_keyboard())
 
 
 @router.callback_query(F.data == "menu")
@@ -487,8 +481,7 @@ async def menu_callback(callback: CallbackQuery):
 @router.callback_query(F.data == "balance")
 async def balance_callback(callback: CallbackQuery):
     save_user(callback.from_user)
-    balance = get_balance(callback.from_user.id)
-    await callback.message.edit_text(f"💰 Твои спасибки: {balance}", reply_markup=main_menu(callback.from_user.id))
+    await callback.message.edit_text(f"💰 Твои спасибки: {get_balance(callback.from_user.id)}", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
 
 
@@ -558,7 +551,11 @@ async def main():
     token = os.getenv("BOT_TOKEN")
     if not token:
         raise RuntimeError("Не указан BOT_TOKEN в переменных окружения")
-    persist_data("Start bot data sync")
+    if db.enabled():
+        print("Supabase storage enabled")
+    else:
+        print("Supabase is not configured, using JSON fallback")
+        persist_data("Start bot data sync")
     bot = Bot(token=token)
     dp = Dispatcher()
     dp.include_router(router)
