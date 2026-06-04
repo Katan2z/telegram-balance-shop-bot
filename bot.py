@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from aiogram import Bot, Dispatcher, F, Router
+from aiogram.exceptions import TelegramNetworkError
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
@@ -48,12 +49,21 @@ def write_json(path: Path, data: Any) -> None:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
-def persist_data(message: str = "Update bot data") -> None:
+def persist_data(message: str = "Update bot data") -> bool:
     generate_public_data()
     try:
         sync_files_to_github(message)
+        return True
     except Exception as error:
         print(f"GitHub sync failed: {error}")
+        return False
+
+
+async def safe_answer(message: Message, text: str, **kwargs) -> None:
+    try:
+        await message.answer(text, **kwargs)
+    except TelegramNetworkError as error:
+        print(f"Telegram answer timeout/error: {error}")
 
 
 def get_env_admin_ids() -> set[int]:
@@ -79,9 +89,9 @@ def get_extra_admin_ids() -> set[int]:
     return result
 
 
-def save_extra_admin_ids(admin_ids: set[int]) -> None:
+def save_extra_admin_ids(admin_ids: set[int]) -> bool:
     write_json(ADMINS_FILE, sorted(admin_ids))
-    persist_data("Update manager permissions")
+    return persist_data("Update manager permissions")
 
 
 def get_admin_ids() -> set[int]:
@@ -186,7 +196,7 @@ def add_transaction(user_id: int, amount: int, transaction_type: str, comment: s
     write_json(TRANSACTIONS_FILE, transactions)
 
 
-def change_balance(user_id: int, amount: int, comment: str = "") -> int:
+def change_balance(user_id: int, amount: int, comment: str = "") -> tuple[int, bool]:
     users = read_json(USERS_FILE, {})
     key = str(user_id)
     if key not in users:
@@ -198,8 +208,8 @@ def change_balance(user_id: int, amount: int, comment: str = "") -> int:
     users[key]["updated_at"] = now()
     write_json(USERS_FILE, users)
     add_transaction(user_id, amount, "balance_change", comment)
-    persist_data("Update balance and rating")
-    return new_balance
+    synced = persist_data("Update balance and rating")
+    return new_balance, synced
 
 
 def get_balance(user_id: int) -> int:
@@ -277,13 +287,14 @@ def get_users_text(limit: int = 20) -> str:
 
 
 def get_stats_text() -> str:
-    persist_data("Update statistics")
+    synced = persist_data("Manual statistics sync")
     users = read_json(USERS_FILE, {})
     transactions = read_json(TRANSACTIONS_FILE, [])
     chats = read_json(CHATS_FILE, {})
     public_data = read_json(PUBLIC_DATA_FILE, {})
     total_balance = sum(int(user.get("balance", 0)) for user in users.values())
-    return ("📊 Статистика\n\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Операций: {len(transactions)}\n" f"Рейтинг за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
+    status = "✅ синхронизировано" if synced else "⚠️ GitHub sync не прошёл"
+    return ("📊 Статистика\n\n" f"Статус: {status}\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Операций: {len(transactions)}\n" f"Рейтинг за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
 
 
 def get_transactions_text(limit: int = 10) -> str:
@@ -298,67 +309,69 @@ def get_transactions_text(limit: int = 10) -> str:
 
 async def handle_start_payload(message: Message, payload: str) -> bool:
     if payload == "app":
-        await message.answer("Нажми кнопку меню «Спасибки» рядом с полем ввода, чтобы открыть Mini App.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
+        await safe_answer(message, "Нажми кнопку меню «Спасибки» рядом с полем ввода, чтобы открыть Mini App.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
         return True
     if payload.startswith("manager_"):
         if not message.from_user or not is_admin(message.from_user.id):
-            await message.answer(admin_only_text())
+            await safe_answer(message, admin_only_text())
             return True
         parts = payload.split("_")
         if len(parts) != 3 or parts[1] not in {"add", "remove"}:
-            await message.answer("Неверная команда менеджеров.")
+            await safe_answer(message, "Неверная команда менеджеров.")
             return True
         try:
             target_user_id = int(parts[2])
         except ValueError:
-            await message.answer("Неверный user_id менеджера.")
+            await safe_answer(message, "Неверный user_id менеджера.")
             return True
         root_admins = get_env_admin_ids()
         extra_admins = get_extra_admin_ids()
         if parts[1] == "add":
             extra_admins.add(target_user_id)
-            save_extra_admin_ids(extra_admins)
-            await message.answer(f"✅ Менеджер добавлен.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}", reply_markup=admin_done_keyboard())
+            synced = save_extra_admin_ids(extra_admins)
+            await safe_answer(message, f"✅ Менеджер добавлен.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}\n\n{'✅ Данные обновлены' if synced else '⚠️ Права изменены локально, но GitHub sync не прошёл'}", reply_markup=admin_done_keyboard())
             return True
         if target_user_id in root_admins:
-            await message.answer("Нельзя убрать главного админа из ADMIN_IDS через приложение.")
+            await safe_answer(message, "Нельзя убрать главного админа из ADMIN_IDS через приложение.")
             return True
         extra_admins.discard(target_user_id)
-        save_extra_admin_ids(extra_admins)
-        await message.answer(f"✅ Менеджер убран.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}", reply_markup=admin_done_keyboard())
+        synced = save_extra_admin_ids(extra_admins)
+        await safe_answer(message, f"✅ Менеджер убран.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}\n\n{'✅ Данные обновлены' if synced else '⚠️ Права изменены локально, но GitHub sync не прошёл'}", reply_markup=admin_done_keyboard())
         return True
     if not payload.startswith("admin_"):
         return False
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer(admin_only_text())
+        await safe_answer(message, admin_only_text())
         return True
     parts = payload.split("_")
     if len(parts) != 3:
-        await message.answer("Неверная команда админки.")
+        await safe_answer(message, "Неверная команда админки.")
         return True
     try:
         target_user_id = int(parts[1])
         amount = int(parts[2])
     except ValueError:
-        await message.answer("Неверные данные начисления.")
+        await safe_answer(message, "Неверные данные начисления.")
         return True
     if amount == 0:
-        await message.answer("Сумма не может быть 0.")
+        await safe_answer(message, "Сумма не может быть 0.")
         return True
     try:
-        new_balance = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
+        new_balance, synced = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
     except ValueError as error:
-        await message.answer(str(error))
+        await safe_answer(message, str(error))
         return True
     target_name = get_user_display_name(target_user_id)
     action = "начислено" if amount > 0 else "списано"
     amount_abs = abs(amount)
-    await message.answer(
+    await safe_answer(
+        message,
         f"✅ Операция выполнена\n\n"
         f"👤 Сотрудник: {target_name}\n"
         f"💰 {action.capitalize()}: {amount_abs} спасибок\n"
-        f"🧾 Новый баланс: {new_balance}\n\n"
-        f"Данные Mini App уже обновляются.",
+        f"🧾 Новый баланс: {new_balance}\n"
+        f"🔄 Синхронизация: {'готово' if synced else 'ошибка GitHub sync'}\n\n"
+        f"Данные Mini App обновятся после синхронизации GitHub Pages.",
         reply_markup=admin_done_keyboard(),
     )
     return True
@@ -375,7 +388,7 @@ async def start_handler(message: Message):
     args = message.text.split(maxsplit=1)
     if len(args) > 1 and await handle_start_payload(message, args[1].strip()):
         return
-    await message.answer("Привет! Это мотивационный магазин спасибок.\n\nЧтобы открыть полноценное Mini App, нажми кнопку меню «Спасибки» рядом с полем ввода.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
+    await safe_answer(message, "Привет! Это мотивационный магазин спасибок.\n\nЧтобы открыть полноценное Mini App, нажми кнопку меню «Спасибки» рядом с полем ввода.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
 
 
 @router.message(Command("app"))
@@ -383,37 +396,37 @@ async def app_handler(message: Message):
     if message.from_user:
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
-    await message.answer("Открой бота в личных сообщениях. Там будет кнопка меню «Спасибки» для запуска приложения:", reply_markup=app_keyboard())
+    await safe_answer(message, "Открой бота в личных сообщениях. Там будет кнопка меню «Спасибки» для запуска приложения:", reply_markup=app_keyboard())
 
 
 @router.message(F.web_app_data)
 async def web_app_data_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer(admin_only_text())
+        await safe_answer(message, admin_only_text())
         return
     try:
         payload = json.loads(message.web_app_data.data)
     except Exception:
-        await message.answer("Не удалось прочитать команду Mini App.")
+        await safe_answer(message, "Не удалось прочитать команду Mini App.")
         return
     if payload.get("action") != "admin_change_balance":
-        await message.answer("Неизвестная команда Mini App.")
+        await safe_answer(message, "Неизвестная команда Mini App.")
         return
     try:
         target_user_id = int(payload.get("target_user_id"))
         amount = int(payload.get("amount"))
     except (TypeError, ValueError):
-        await message.answer("Неверные данные начисления.")
+        await safe_answer(message, "Неверные данные начисления.")
         return
     if amount == 0:
-        await message.answer("Сумма не может быть 0.")
+        await safe_answer(message, "Сумма не может быть 0.")
         return
     try:
-        new_balance = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
+        new_balance, synced = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
     except ValueError as error:
-        await message.answer(str(error))
+        await safe_answer(message, str(error))
         return
-    await message.answer(f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}", reply_markup=admin_done_keyboard())
+    await safe_answer(message, f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}\nСинхронизация: {'готово' if synced else 'ошибка'}", reply_markup=admin_done_keyboard())
 
 
 @router.message(F.new_chat_members)
@@ -423,55 +436,55 @@ async def new_members_handler(message: Message):
             continue
         save_user(user)
         save_chat_member(message.chat, user)
-    await message.answer("✅ Новые участники добавлены в базу.")
+    await safe_answer(message, "✅ Новые участники добавлены в базу.")
 
 
 @router.message(Command("admin"))
 async def admin_command_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer(admin_only_text())
+        await safe_answer(message, admin_only_text())
         return
-    await message.answer("👑 Админка", reply_markup=admin_keyboard())
+    await safe_answer(message, "👑 Админка", reply_markup=admin_keyboard())
 
 
 @router.message(Command("add_balance"))
 async def add_balance_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer("⛔ У тебя нет доступа к этой команде.")
+        await safe_answer(message, "⛔ У тебя нет доступа к этой команде.")
         return
     parts = message.text.split()
     if len(parts) != 3:
-        await message.answer("Использование:\n/add_balance user_id amount")
+        await safe_answer(message, "Использование:\n/add_balance user_id amount")
         return
     try:
         user_id = int(parts[1])
         amount = int(parts[2])
     except ValueError:
-        await message.answer("user_id и amount должны быть числами.")
+        await safe_answer(message, "user_id и amount должны быть числами.")
         return
     try:
-        new_balance = change_balance(user_id, amount, f"Начисление спасибок админом {message.from_user.id}")
+        new_balance, synced = change_balance(user_id, amount, f"Начисление спасибок админом {message.from_user.id}")
     except ValueError as error:
-        await message.answer(str(error))
+        await safe_answer(message, str(error))
         return
-    await message.answer(f"✅ Пользователь {user_id} получил {amount} спасибок.\nНовый баланс: {new_balance}")
+    await safe_answer(message, f"✅ Пользователь {user_id} получил {amount} спасибок.\nНовый баланс: {new_balance}\nСинхронизация: {'готово' if synced else 'ошибка GitHub sync'}")
 
 
 @router.message(Command("users"))
 async def users_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer("⛔ У тебя нет доступа к этой команде.")
+        await safe_answer(message, "⛔ У тебя нет доступа к этой команде.")
         return
-    await message.answer(get_users_text())
+    await safe_answer(message, get_users_text())
 
 
 @router.message(Command("sync"))
 async def sync_handler(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
-        await message.answer("⛔ У тебя нет доступа к этой команде.")
+        await safe_answer(message, "⛔ У тебя нет доступа к этой команде.")
         return
-    persist_data("Manual data sync")
-    await message.answer("✅ Данные Mini App обновлены.")
+    synced = persist_data("Manual data sync")
+    await safe_answer(message, "✅ Данные Mini App обновлены." if synced else "⚠️ Данные пересобраны локально, но GitHub sync не прошёл. Смотри логи Actions.")
 
 
 @router.message()
@@ -486,16 +499,16 @@ async def collect_user_handler(message: Message):
         return
     parts = message.text.split()
     if len(parts) != 2:
-        await message.answer("Нужно отправить так:\nuser_id сумма\n\nНапример:\n123456789 500")
+        await safe_answer(message, "Нужно отправить так:\nuser_id сумма\n\nНапример:\n123456789 500")
         return
     try:
         user_id = int(parts[0])
         amount = int(parts[1])
     except ValueError:
-        await message.answer("user_id и сумма должны быть числами.")
+        await safe_answer(message, "user_id и сумма должны быть числами.")
         return
     if amount <= 0:
-        await message.answer("Сумма должна быть больше 0.")
+        await safe_answer(message, "Сумма должна быть больше 0.")
         return
     if state == "add_balance":
         real_amount = amount
@@ -504,12 +517,12 @@ async def collect_user_handler(message: Message):
         real_amount = -amount
         comment = f"Списание спасибок через админку админом {message.from_user.id}"
     try:
-        new_balance = change_balance(user_id, real_amount, comment)
+        new_balance, synced = change_balance(user_id, real_amount, comment)
     except ValueError as error:
-        await message.answer(str(error))
+        await safe_answer(message, str(error))
         return
     ADMIN_STATES.pop(message.from_user.id, None)
-    await message.answer(f"✅ Готово.\nПользователь: {user_id}\nИзменение: {real_amount}\nНовый баланс: {new_balance}", reply_markup=admin_keyboard())
+    await safe_answer(message, f"✅ Готово.\nПользователь: {user_id}\nИзменение: {real_amount}\nНовый баланс: {new_balance}\nСинхронизация: {'готово' if synced else 'ошибка GitHub sync'}", reply_markup=admin_keyboard())
 
 
 @router.callback_query(F.data == "menu")
