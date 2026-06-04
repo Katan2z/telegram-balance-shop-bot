@@ -22,7 +22,7 @@ TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
 CHATS_FILE = DATA_DIR / "chats.json"
 PUBLIC_DATA_FILE = DOCS_DIR / "public-data.json"
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_bot")
 
 ADMIN_STATES: dict[int, str] = {}
 
@@ -185,9 +185,13 @@ def get_balance(user_id: int) -> int:
     return int(users.get(str(user_id), {}).get("balance", 0))
 
 
+def bot_private_url() -> str:
+    return f"https://t.me/{BOT_USERNAME}?start=app"
+
+
 def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(text="🚀 Открыть приложение", url=MINI_APP_URL)],
+        [InlineKeyboardButton(text="🚀 Открыть приложение", url=bot_private_url())],
         [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
         [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
     ]
@@ -197,7 +201,7 @@ def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
 
 
 def app_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть бота", url=f"https://t.me/{BOT_USERNAME}?start=app")]])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть бота", url=bot_private_url())]])
 
 
 def admin_keyboard() -> InlineKeyboardMarkup:
