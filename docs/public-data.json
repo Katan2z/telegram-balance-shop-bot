@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-03T23:51:04.620434",
+  "updated_at": "2026-06-04T00:21:03.156474",
   "currency_name": "спасибки",
   "month": "2026-06",
   "top_month": [
@@ -39,6 +39,9 @@
       "received_total": 25
     }
   },
+  "admin_ids": [
+    "818748106"
+  ],
   "products": [
     {
       "id": 1,
