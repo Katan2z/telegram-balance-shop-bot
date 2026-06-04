@@ -27,10 +27,9 @@
       </div>
     </section>
 
-    <nav class="tabs">
+    <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="home">Главная</button>
       <button class="tab" data-tab="rating">Рейтинг</button>
-      <button class="tab" data-tab="shop">Магазин</button>
     </nav>
 
     <section class="tab-page active" id="tab-home">
@@ -53,10 +52,20 @@
       </article>
     </section>
 
-    <section class="tab-page" id="tab-shop">
-      <article class="card shop-card">
-        <h2>🎁 Магазин призов</h2>
-        <div id="products" class="products"></div>
+    <section class="tab-page" id="tab-admin">
+      <article class="card admin-panel">
+        <h2>👑 Управление</h2>
+        <div class="admin-form">
+          <label>Сотрудник</label>
+          <select id="adminUser"></select>
+          <label>Сумма</label>
+          <input id="adminAmount" type="number" min="1" step="1" placeholder="Например 10" />
+          <div class="admin-actions">
+            <button id="adminAdd" class="action-btn add">+ Начислить</button>
+            <button id="adminRemove" class="action-btn remove">− Списать</button>
+          </div>
+          <p id="adminStatus" class="admin-status"></p>
+        </div>
       </article>
     </section>
   </main>
