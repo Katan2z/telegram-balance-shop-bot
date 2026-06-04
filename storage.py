@@ -1,12 +1,8 @@
-import base64
-import json
 import os
+import subprocess
+import time
 from pathlib import Path
 
-from github import Github
-
-REPO_FULL_NAME = os.getenv("GITHUB_REPOSITORY", "Katan2z/telegram-balance-shop-bot")
-BRANCH = os.getenv("GITHUB_REF_NAME", "main")
 PATHS_TO_SYNC = [
     "data/users.json",
     "data/transactions.json",
@@ -20,28 +16,46 @@ def github_available() -> bool:
     return bool(os.getenv("GITHUB_TOKEN"))
 
 
+def run_git(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args],
+        check=check,
+        text=True,
+        capture_output=True,
+    )
+
+
 def sync_files_to_github(message: str = "Update bot data") -> None:
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
+    if not github_available():
         return
 
-    gh = Github(token)
-    repo = gh.get_repo(REPO_FULL_NAME)
+    existing_paths = [path for path in PATHS_TO_SYNC if Path(path).exists()]
+    if not existing_paths:
+        return
 
-    for path in PATHS_TO_SYNC:
-        local_path = Path(path)
-        if not local_path.exists():
+    run_git(["config", "user.name", "github-actions"])
+    run_git(["config", "user.email", "github-actions@github.com"])
+
+    for attempt in range(3):
+        run_git(["add", *existing_paths])
+        diff = run_git(["diff", "--cached", "--quiet"], check=False)
+        if diff.returncode == 0:
+            return
+
+        commit = run_git(["commit", "-m", message], check=False)
+        if commit.returncode != 0 and "nothing to commit" not in (commit.stdout + commit.stderr).lower():
+            raise RuntimeError(commit.stderr or commit.stdout)
+
+        pull = run_git(["pull", "--rebase"], check=False)
+        if pull.returncode != 0:
+            run_git(["rebase", "--abort"], check=False)
+            run_git(["pull", "--no-rebase", "--strategy-option=ours"], check=False)
+
+        push = run_git(["push"], check=False)
+        if push.returncode == 0:
+            return
+
+        if attempt < 2:
+            time.sleep(1.2 * (attempt + 1))
             continue
-
-        content = local_path.read_text(encoding="utf-8")
-        try:
-            current = repo.get_contents(path, ref=BRANCH)
-            remote_content = base64.b64decode(current.content).decode("utf-8")
-            if remote_content == content:
-                continue
-            repo.update_file(path, message, content, current.sha, branch=BRANCH)
-        except Exception as error:
-            if "404" in str(error):
-                repo.create_file(path, message, content, branch=BRANCH)
-            else:
-                raise
+        raise RuntimeError(push.stderr or push.stdout)
