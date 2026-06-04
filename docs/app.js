@@ -5,7 +5,7 @@ const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
 const medal = ["🥇", "🥈", "🥉"];
 const BOT_USERNAME = "bk8_shop_bot";
-const ADMIN_IDS = ["818748106", "747818163", "5311640125"];
+const ROOT_ADMIN_IDS = ["818748106", "747818163", "5311640125"];
 const RAW_DATA_URL = "https://raw.githubusercontent.com/Katan2z/telegram-balance-shop-bot/main/docs/public-data.json";
 
 function setText(id, value) {
@@ -52,10 +52,26 @@ function userNameFromRow(row) {
   return "Сотрудник";
 }
 
+async function supabaseFetch(path) {
+  const config = window.APP_CONFIG || {};
+  const url = String(config.SUPABASE_URL || "").replace(/\/$/, "");
+  const key = config.SUPABASE_ANON_KEY || "";
+  if (!url || !key) throw new Error("Supabase config missing");
+  const response = await fetch(`${url}/rest/v1/${path}`, {
+    cache: "no-store",
+    headers: {
+      "apikey": key,
+      "Authorization": `Bearer ${key}`,
+    },
+  });
+  if (!response.ok) throw new Error(`Supabase request failed: ${path}`);
+  return response.json();
+}
+
 function normalizeData(data) {
   data.users = data.users || {};
-  data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ADMIN_IDS]));
-  data.root_admin_ids = ADMIN_IDS;
+  data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
+  data.root_admin_ids = Array.from(new Set([...(data.root_admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
   data.top_month = Object.entries(data.users)
     .map(([id, item]) => ({ user_id: id, name: item.name || "Сотрудник", amount: Number(item.balance || 0) }))
     .filter(item => item.amount > 0)
@@ -65,22 +81,13 @@ function normalizeData(data) {
 }
 
 async function loadSupabaseData() {
-  const config = window.APP_CONFIG || {};
-  const url = String(config.SUPABASE_URL || "").replace(/\/$/, "");
-  const key = config.SUPABASE_ANON_KEY || "";
-  if (!url || !key) throw new Error("Supabase config missing");
+  const [usersRows, managerRows] = await Promise.all([
+    supabaseFetch("users?select=telegram_id,username,first_name,last_name,balance,updated_at&order=balance.desc"),
+    supabaseFetch("managers?select=telegram_id,created_by,created_at"),
+  ]);
 
-  const response = await fetch(`${url}/rest/v1/users?select=telegram_id,username,first_name,last_name,balance,updated_at&order=balance.desc`, {
-    cache: "no-store",
-    headers: {
-      "apikey": key,
-      "Authorization": `Bearer ${key}`,
-    },
-  });
-  if (!response.ok) throw new Error("Supabase users unavailable");
-  const rows = await response.json();
   const users = {};
-  for (const row of rows) {
+  for (const row of usersRows) {
     const id = String(row.telegram_id);
     const balance = Number(row.balance || 0);
     users[id] = {
@@ -90,7 +97,15 @@ async function loadSupabaseData() {
       received_total: balance,
     };
   }
-  return normalizeData({ users, admin_ids: ADMIN_IDS, root_admin_ids: ADMIN_IDS, top_month: [] });
+
+  const managerIds = managerRows.map(row => String(row.telegram_id));
+  return normalizeData({
+    users,
+    managers: managerRows,
+    admin_ids: [...ROOT_ADMIN_IDS, ...managerIds],
+    root_admin_ids: ROOT_ADMIN_IDS,
+    top_month: [],
+  });
 }
 
 async function loadData() {
@@ -174,17 +189,25 @@ function isAdmin(data) {
   return Boolean(userId && data.admin_ids && data.admin_ids.map(String).includes(userId));
 }
 
-function ensureAdminTab() {
+function isRootAdmin(data) {
+  return Boolean(userId && data.root_admin_ids && data.root_admin_ids.map(String).includes(userId));
+}
+
+function ensureAdminTabs(data) {
   const tabs = document.getElementById("tabs");
   if (!tabs.querySelector('[data-tab="admin"]')) {
     tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="admin">Админка</button>');
     tabs.querySelector('[data-tab="admin"]').addEventListener("click", () => switchTab("admin"));
   }
+  if (isRootAdmin(data) && !tabs.querySelector('[data-tab="managers"]')) {
+    tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="managers">Менеджеры</button>');
+    tabs.querySelector('[data-tab="managers"]').addEventListener("click", () => switchTab("managers"));
+  }
 }
 
 function setupAdmin(data) {
   if (!isAdmin(data)) return;
-  ensureAdminTab();
+  ensureAdminTabs(data);
 
   const select = document.getElementById("adminUser");
   select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
@@ -211,12 +234,68 @@ function setupAdmin(data) {
   document.getElementById("adminRemove").onclick = () => sendChange(-1);
 }
 
+function setupManagers(data) {
+  if (!isRootAdmin(data)) return;
+
+  const select = document.getElementById("managerUser");
+  const status = document.getElementById("managerStatus");
+  const list = document.getElementById("managersList");
+  if (!select || !status || !list) return;
+
+  const adminIds = new Set((data.admin_ids || []).map(String));
+  const rootIds = new Set((data.root_admin_ids || []).map(String));
+
+  select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
+    const role = rootIds.has(id) ? " · главный админ" : (adminIds.has(id) ? " · менеджер" : "");
+    return `<option value="${htmlEscape(id)}">${htmlEscape((item.name || "Сотрудник") + role)}</option>`;
+  }).join("");
+
+  document.getElementById("managerAdd").onclick = () => {
+    const targetUserId = select.value;
+    if (!targetUserId) {
+      status.textContent = "Выбери сотрудника";
+      return;
+    }
+    status.textContent = "Открываю бота для выдачи прав";
+    openBotDeepLink(`manager_add_${targetUserId}`);
+  };
+
+  document.getElementById("managerRemove").onclick = () => {
+    const targetUserId = select.value;
+    if (!targetUserId) {
+      status.textContent = "Выбери сотрудника";
+      return;
+    }
+    if (rootIds.has(String(targetUserId))) {
+      status.textContent = "Главного админа нельзя убрать";
+      return;
+    }
+    status.textContent = "Открываю бота для снятия прав";
+    openBotDeepLink(`manager_remove_${targetUserId}`);
+  };
+
+  const rows = Object.entries(data.users || {})
+    .filter(([id]) => adminIds.has(String(id)))
+    .map(([id, item]) => `
+      <div class="rank manager-row">
+        ${avatar(item.name)}
+        <div>
+          <strong>${htmlEscape(item.name || "Сотрудник")}</strong>
+          <span>ID: ${htmlEscape(id)}${rootIds.has(String(id)) ? " · главный админ" : " · менеджер"}</span>
+        </div>
+      </div>
+    `).join("");
+
+  list.innerHTML = rows || `<p>Менеджеров пока нет.</p>`;
+}
+
 async function refreshData() {
   const data = await loadData();
   renderTop(data.top_month);
   renderHero(data.top_month);
   renderMyStats(data);
   setupAdmin(data);
+  setupManagers(data);
 }
 
 async function main() {
