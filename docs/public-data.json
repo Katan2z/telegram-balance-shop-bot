@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T02:11:44.208026",
+  "updated_at": "2026-06-04T02:11:48.483617",
   "currency_name": "спасибки",
   "month": "2026-06",
   "top_month": [
@@ -22,7 +22,7 @@
   "users": {
     "818748106": {
       "name": "Костя",
-      "balance": 108,
+      "balance": 106,
       "received_month": 103,
       "received_total": 108
     },
@@ -53,7 +53,7 @@
   ],
   "stats": {
     "users_count": 3,
-    "transactions_count": 11,
+    "transactions_count": 12,
     "total_given_month": 357
   }
 }
