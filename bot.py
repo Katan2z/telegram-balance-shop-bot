@@ -185,6 +185,12 @@ def get_balance(user_id: int) -> int:
     return int(users.get(str(user_id), {}).get("balance", 0))
 
 
+def get_user_display_name(user_id: int) -> str:
+    users = read_json(USERS_FILE, {})
+    user = users.get(str(user_id), {})
+    return public_name(user)
+
+
 def bot_private_url(payload: str = "app") -> str:
     return f"https://t.me/{BOT_USERNAME}?start={payload}"
 
@@ -201,7 +207,7 @@ def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
 
 
 def app_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть бота", url=bot_private_url())]])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть приложение", url=MINI_APP_URL)]])
 
 
 def admin_keyboard() -> InlineKeyboardMarkup:
@@ -212,6 +218,13 @@ def admin_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="🧾 Последние операции", callback_data="admin_transactions")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")],
+    ])
+
+
+def admin_done_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="↩️ Вернуться в приложение", url=MINI_APP_URL)],
+        [InlineKeyboardButton(text="👑 Админка в боте", callback_data="admin")],
     ])
 
 
@@ -288,7 +301,17 @@ async def handle_start_payload(message: Message, payload: str) -> bool:
     except ValueError as error:
         await message.answer(str(error))
         return True
-    await message.answer(f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}")
+    target_name = get_user_display_name(target_user_id)
+    action = "начислено" if amount > 0 else "списано"
+    amount_abs = abs(amount)
+    await message.answer(
+        f"✅ Операция выполнена\n\n"
+        f"👤 Сотрудник: {target_name}\n"
+        f"💰 {action.capitalize()}: {amount_abs} спасибок\n"
+        f"🧾 Новый баланс: {new_balance}\n\n"
+        f"Данные Mini App уже обновляются.",
+        reply_markup=admin_done_keyboard(),
+    )
     return True
 
 
@@ -341,7 +364,7 @@ async def web_app_data_handler(message: Message):
     except ValueError as error:
         await message.answer(str(error))
         return
-    await message.answer(f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}")
+    await message.answer(f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}", reply_markup=admin_done_keyboard())
 
 
 @router.message(F.new_chat_members)
