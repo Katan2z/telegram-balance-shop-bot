@@ -1,4 +1,5 @@
 import json
+import os
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +11,7 @@ DOCS_DIR = BASE_DIR / "docs"
 USERS_FILE = DATA_DIR / "users.json"
 PRODUCTS_FILE = DATA_DIR / "products.json"
 TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
+ADMINS_FILE = DATA_DIR / "admins.json"
 PUBLIC_DATA_FILE = DOCS_DIR / "public-data.json"
 
 
@@ -39,14 +41,36 @@ def public_name(user: dict) -> str:
     return "Сотрудник"
 
 
+def get_env_admin_ids() -> set[int]:
+    result = set()
+    for item in os.getenv("ADMIN_IDS", "").split(","):
+        item = item.strip()
+        if item.isdigit():
+            result.add(int(item))
+    return result
+
+
+def get_extra_admin_ids() -> set[int]:
+    data = read_json(ADMINS_FILE, [])
+    if isinstance(data, dict):
+        data = data.get("admin_ids", [])
+    result = set()
+    for item in data:
+        try:
+            result.add(int(item))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
 def main() -> None:
     users = read_json(USERS_FILE, {})
     products = read_json(PRODUCTS_FILE, [])
     transactions = read_json(TRANSACTIONS_FILE, [])
     current_month = now()[:7]
 
-    received_total = defaultdict(int)
-    received_month = defaultdict(int)
+    rating_total = defaultdict(int)
+    rating_month = defaultdict(int)
     total_given_month = 0
 
     for tx in transactions:
@@ -54,19 +78,19 @@ def main() -> None:
         amount = int(tx.get("amount", 0) or 0)
         created_at = str(tx.get("created_at", ""))
         comment = str(tx.get("comment", ""))
-        if amount <= 0 or "Списание" in comment or "Покупка" in comment:
+        if "Покупка" in comment:
             continue
-        received_total[user_id] += amount
+        rating_total[user_id] += amount
         if created_at.startswith(current_month):
-            received_month[user_id] += amount
+            rating_month[user_id] += amount
             total_given_month += amount
 
     public_users = {
         str(user_id): {
             "name": public_name(user),
             "balance": int(user.get("balance", 0) or 0),
-            "received_month": received_month[str(user_id)],
-            "received_total": received_total[str(user_id)],
+            "received_month": rating_month[str(user_id)],
+            "received_total": rating_total[str(user_id)],
         }
         for user_id, user in users.items()
     }
@@ -77,8 +101,12 @@ def main() -> None:
             "name": public_name(users.get(user_id, {})),
             "amount": amount,
         }
-        for user_id, amount in sorted(received_month.items(), key=lambda item: item[1], reverse=True)[:3]
+        for user_id, amount in sorted(rating_month.items(), key=lambda item: item[1], reverse=True)[:3]
     ]
+
+    env_admin_ids = get_env_admin_ids()
+    extra_admin_ids = get_extra_admin_ids()
+    admin_ids = env_admin_ids | extra_admin_ids
 
     write_json(PUBLIC_DATA_FILE, {
         "updated_at": now(),
@@ -86,6 +114,9 @@ def main() -> None:
         "month": current_month,
         "top_month": top_month,
         "users": public_users,
+        "admin_ids": [str(admin_id) for admin_id in sorted(admin_ids)],
+        "root_admin_ids": [str(admin_id) for admin_id in sorted(env_admin_ids)],
+        "extra_admin_ids": [str(admin_id) for admin_id in sorted(extra_admin_ids)],
         "products": [product for product in products if product.get("active", True)],
         "stats": {
             "users_count": len(users),
