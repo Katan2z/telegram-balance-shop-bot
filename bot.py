@@ -89,7 +89,6 @@ def generate_public_data() -> None:
     received_total = defaultdict(int)
     received_month = defaultdict(int)
     total_given_month = 0
-
     for tx in transactions:
         user_id = str(tx.get("user_id"))
         amount = int(tx.get("amount", 0) or 0)
@@ -102,31 +101,14 @@ def generate_public_data() -> None:
         if created_at.startswith(current_month):
             received_month[user_id] += amount
             total_given_month += amount
-
     public_users = {}
     for user_id, user in users.items():
-        public_users[user_id] = {
-            "name": public_name(user),
-            "balance": int(user.get("balance", 0) or 0),
-            "received_month": received_month[user_id],
-            "received_total": received_total[user_id],
-        }
-
+        public_users[user_id] = {"name": public_name(user), "balance": int(user.get("balance", 0) or 0), "received_month": received_month[user_id], "received_total": received_total[user_id]}
     top_month = []
     for user_id, amount in sorted(received_month.items(), key=lambda item: item[1], reverse=True)[:3]:
         user = users.get(user_id, {})
         top_month.append({"user_id": user_id, "name": public_name(user), "amount": amount})
-
-    public_data = {
-        "updated_at": now(),
-        "currency_name": "спасибки",
-        "month": current_month,
-        "top_month": top_month,
-        "users": public_users,
-        "admin_ids": [str(admin_id) for admin_id in get_admin_ids()],
-        "products": [product for product in products if product.get("active", True)],
-        "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month},
-    }
+    public_data = {"updated_at": now(), "currency_name": "спасибки", "month": current_month, "top_month": top_month, "users": public_users, "admin_ids": [str(admin_id) for admin_id in get_admin_ids()], "products": [product for product in products if product.get("active", True)], "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month}}
     write_json(PUBLIC_DATA_FILE, public_data)
 
 
@@ -204,13 +186,17 @@ def get_balance(user_id: int) -> int:
 
 def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(text="🚀 Открыть приложение", web_app=WebAppInfo(url=MINI_APP_URL))],
+        [InlineKeyboardButton(text="🚀 Открыть приложение", url=MINI_APP_URL)],
         [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
         [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
     ]
     if user_id and is_admin(user_id):
         buttons.append([InlineKeyboardButton(text="👑 Админка", callback_data="admin")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def app_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть Спасибки", web_app=WebAppInfo(url=MINI_APP_URL))]])
 
 
 def admin_keyboard() -> InlineKeyboardMarkup:
@@ -279,6 +265,14 @@ async def start_handler(message: Message):
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
     await message.answer("Привет! Это мотивационный магазин спасибок.\n\nВыбери действие:", reply_markup=main_menu(message.from_user.id if message.from_user else None))
+
+
+@router.message(Command("app"))
+async def app_handler(message: Message):
+    if message.from_user:
+        save_user(message.from_user)
+        save_chat_member(message.chat, message.from_user)
+    await message.answer("Открыть мини-приложение:", reply_markup=app_keyboard())
 
 
 @router.message(F.web_app_data)
@@ -423,7 +417,7 @@ async def balance_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data == "help")
 async def help_callback(callback: CallbackQuery):
-    await callback.message.edit_text("ℹ️ Помощь\n\n🚀 Открыть приложение — Mini App со статистикой.\n💰 Баланс — проверить спасибки.\n\nАдмин-команды:\n/admin — открыть админку\n/add_balance user_id amount — начислить спасибки\n/users — список пользователей\n/sync — обновить данные Mini App", reply_markup=main_menu(callback.from_user.id))
+    await callback.message.edit_text("ℹ️ Помощь\n\n🚀 Открыть приложение — ссылка на приложение.\n/app — попробовать открыть как Mini App.\n💰 Баланс — проверить спасибки.\n\nАдмин-команды:\n/admin — открыть админку\n/add_balance user_id amount — начислить спасибки\n/users — список пользователей\n/sync — обновить данные Mini App", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
 
 
