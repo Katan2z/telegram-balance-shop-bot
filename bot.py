@@ -185,8 +185,8 @@ def get_balance(user_id: int) -> int:
     return int(users.get(str(user_id), {}).get("balance", 0))
 
 
-def bot_private_url() -> str:
-    return f"https://t.me/{BOT_USERNAME}?start=app"
+def bot_private_url(payload: str = "app") -> str:
+    return f"https://t.me/{BOT_USERNAME}?start={payload}"
 
 
 def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
@@ -261,6 +261,37 @@ def get_transactions_text(limit: int = 10) -> str:
     return text
 
 
+async def handle_start_payload(message: Message, payload: str) -> bool:
+    if payload == "app":
+        await message.answer("Нажми кнопку меню «Спасибки» рядом с полем ввода, чтобы открыть Mini App.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
+        return True
+    if not payload.startswith("admin_"):
+        return False
+    if not message.from_user or not is_admin(message.from_user.id):
+        await message.answer(admin_only_text())
+        return True
+    parts = payload.split("_")
+    if len(parts) != 3:
+        await message.answer("Неверная команда админки.")
+        return True
+    try:
+        target_user_id = int(parts[1])
+        amount = int(parts[2])
+    except ValueError:
+        await message.answer("Неверные данные начисления.")
+        return True
+    if amount == 0:
+        await message.answer("Сумма не может быть 0.")
+        return True
+    try:
+        new_balance = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
+    except ValueError as error:
+        await message.answer(str(error))
+        return True
+    await message.answer(f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}")
+    return True
+
+
 router = Router()
 
 
@@ -269,6 +300,9 @@ async def start_handler(message: Message):
     if message.from_user:
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
+    args = message.text.split(maxsplit=1)
+    if len(args) > 1 and await handle_start_payload(message, args[1].strip()):
+        return
     await message.answer("Привет! Это мотивационный магазин спасибок.\n\nЧтобы открыть полноценное Mini App, нажми кнопку меню «Спасибки» рядом с полем ввода.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
 
 
