@@ -21,10 +21,13 @@ USERS_FILE = DATA_DIR / "users.json"
 PRODUCTS_FILE = DATA_DIR / "products.json"
 TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
 CHATS_FILE = DATA_DIR / "chats.json"
-ADMINS_FILE = DATA_DIR / "admins.json"
 PUBLIC_DATA_FILE = DOCS_DIR / "public-data.json"
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
+
+# Стабильный список админов после отката менеджерки.
+# Эти ID добавлены сюда, чтобы не зависеть от сломанной динамической схемы admins.json.
+DEFAULT_ADMIN_IDS = {818748106, 747818163, 5311640125}
 
 ADMIN_STATES: dict[int, str] = {}
 
@@ -66,36 +69,14 @@ async def safe_answer(message: Message, text: str, **kwargs) -> None:
         print(f"Telegram answer timeout/error: {error}")
 
 
-def get_env_admin_ids() -> set[int]:
+def get_admin_ids() -> set[int]:
+    result = set(DEFAULT_ADMIN_IDS)
     raw = os.getenv("ADMIN_IDS", "")
-    result = set()
     for item in raw.split(","):
         item = item.strip()
         if item.isdigit():
             result.add(int(item))
     return result
-
-
-def get_extra_admin_ids() -> set[int]:
-    data = read_json(ADMINS_FILE, [])
-    result = set()
-    if isinstance(data, dict):
-        data = data.get("admin_ids", [])
-    for item in data:
-        try:
-            result.add(int(item))
-        except (TypeError, ValueError):
-            continue
-    return result
-
-
-def save_extra_admin_ids(admin_ids: set[int]) -> bool:
-    write_json(ADMINS_FILE, sorted(admin_ids))
-    return persist_data("Update manager permissions")
-
-
-def get_admin_ids() -> set[int]:
-    return get_env_admin_ids() | get_extra_admin_ids()
 
 
 def is_admin(user_id: int) -> bool:
@@ -120,9 +101,10 @@ def generate_public_data() -> None:
     products = read_json(PRODUCTS_FILE, [])
     transactions = read_json(TRANSACTIONS_FILE, [])
     current_month = month_key()
+
     rating_total = defaultdict(int)
     rating_month = defaultdict(int)
-    total_given_month = 0
+
     for tx in transactions:
         user_id = str(tx.get("user_id"))
         amount = int(tx.get("amount", 0) or 0)
@@ -133,15 +115,46 @@ def generate_public_data() -> None:
         rating_total[user_id] += amount
         if created_at.startswith(current_month):
             rating_month[user_id] += amount
-            total_given_month += amount
+
     public_users = {}
     for user_id, user in users.items():
-        public_users[user_id] = {"name": public_name(user), "balance": int(user.get("balance", 0) or 0), "received_month": rating_month[user_id], "received_total": rating_total[user_id]}
-    top_month = []
-    for user_id, amount in sorted(rating_month.items(), key=lambda item: item[1], reverse=True)[:3]:
-        user = users.get(user_id, {})
-        top_month.append({"user_id": user_id, "name": public_name(user), "amount": amount})
-    public_data = {"updated_at": now(), "currency_name": "спасибки", "month": current_month, "top_month": top_month, "users": public_users, "admin_ids": [str(admin_id) for admin_id in get_admin_ids()], "root_admin_ids": [str(admin_id) for admin_id in get_env_admin_ids()], "extra_admin_ids": [str(admin_id) for admin_id in get_extra_admin_ids()], "products": [product for product in products if product.get("active", True)], "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month}}
+        balance = int(user.get("balance", 0) or 0)
+        public_users[user_id] = {
+            "name": public_name(user),
+            "balance": balance,
+            "received_month": balance,
+            "received_total": rating_total[user_id],
+        }
+
+    top_month = [
+        {
+            "user_id": user_id,
+            "name": public_name(users.get(user_id, {})),
+            "amount": int(user.get("balance", 0) or 0),
+        }
+        for user_id, user in users.items()
+        if int(user.get("balance", 0) or 0) > 0
+    ]
+    top_month.sort(key=lambda item: item["amount"], reverse=True)
+    top_month = top_month[:3]
+
+    admin_ids = sorted(get_admin_ids())
+    public_data = {
+        "updated_at": now(),
+        "currency_name": "спасибки",
+        "month": current_month,
+        "top_month": top_month,
+        "users": public_users,
+        "admin_ids": [str(admin_id) for admin_id in admin_ids],
+        "root_admin_ids": [str(admin_id) for admin_id in admin_ids],
+        "extra_admin_ids": [],
+        "products": [product for product in products if product.get("active", True)],
+        "stats": {
+            "users_count": len(users),
+            "transactions_count": len(transactions),
+            "total_given_month": sum(item["amount"] for item in top_month),
+        },
+    }
     write_json(PUBLIC_DATA_FILE, public_data)
 
 
@@ -149,7 +162,15 @@ def save_user(user) -> dict:
     users = read_json(USERS_FILE, {})
     telegram_id = str(user.id)
     if telegram_id not in users:
-        users[telegram_id] = {"telegram_id": user.id, "username": user.username, "first_name": user.first_name, "last_name": user.last_name, "balance": 0, "created_at": now(), "updated_at": now()}
+        users[telegram_id] = {
+            "telegram_id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "balance": 0,
+            "created_at": now(),
+            "updated_at": now(),
+        }
     else:
         users[telegram_id]["username"] = user.username
         users[telegram_id]["first_name"] = user.first_name
@@ -291,10 +312,9 @@ def get_stats_text() -> str:
     users = read_json(USERS_FILE, {})
     transactions = read_json(TRANSACTIONS_FILE, [])
     chats = read_json(CHATS_FILE, {})
-    public_data = read_json(PUBLIC_DATA_FILE, {})
     total_balance = sum(int(user.get("balance", 0)) for user in users.values())
     status = "✅ синхронизировано" if synced else "⚠️ GitHub sync не прошёл"
-    return ("📊 Статистика\n\n" f"Статус: {status}\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Операций: {len(transactions)}\n" f"Рейтинг за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
+    return f"📊 Статистика\n\nСтатус: {status}\nПользователей: {len(users)}\nЧатов: {len(chats)}\nОпераций: {len(transactions)}\nОбщий баланс пользователей: {total_balance}"
 
 
 def get_transactions_text(limit: int = 10) -> str:
@@ -310,33 +330,6 @@ def get_transactions_text(limit: int = 10) -> str:
 async def handle_start_payload(message: Message, payload: str) -> bool:
     if payload == "app":
         await safe_answer(message, "Нажми кнопку меню «Спасибки» рядом с полем ввода, чтобы открыть Mini App.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
-        return True
-    if payload.startswith("manager_"):
-        if not message.from_user or not is_admin(message.from_user.id):
-            await safe_answer(message, admin_only_text())
-            return True
-        parts = payload.split("_")
-        if len(parts) != 3 or parts[1] not in {"add", "remove"}:
-            await safe_answer(message, "Неверная команда менеджеров.")
-            return True
-        try:
-            target_user_id = int(parts[2])
-        except ValueError:
-            await safe_answer(message, "Неверный user_id менеджера.")
-            return True
-        root_admins = get_env_admin_ids()
-        extra_admins = get_extra_admin_ids()
-        if parts[1] == "add":
-            extra_admins.add(target_user_id)
-            synced = save_extra_admin_ids(extra_admins)
-            await safe_answer(message, f"✅ Менеджер добавлен.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}\n\n{'✅ Данные обновлены' if synced else '⚠️ Права изменены локально, но GitHub sync не прошёл'}", reply_markup=admin_done_keyboard())
-            return True
-        if target_user_id in root_admins:
-            await safe_answer(message, "Нельзя убрать главного админа из ADMIN_IDS через приложение.")
-            return True
-        extra_admins.discard(target_user_id)
-        synced = save_extra_admin_ids(extra_admins)
-        await safe_answer(message, f"✅ Менеджер убран.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}\n\n{'✅ Данные обновлены' if synced else '⚠️ Права изменены локально, но GitHub sync не прошёл'}", reply_markup=admin_done_keyboard())
         return True
     if not payload.startswith("admin_"):
         return False
@@ -363,15 +356,9 @@ async def handle_start_payload(message: Message, payload: str) -> bool:
         return True
     target_name = get_user_display_name(target_user_id)
     action = "начислено" if amount > 0 else "списано"
-    amount_abs = abs(amount)
     await safe_answer(
         message,
-        f"✅ Операция выполнена\n\n"
-        f"👤 Сотрудник: {target_name}\n"
-        f"💰 {action.capitalize()}: {amount_abs} спасибок\n"
-        f"🧾 Новый баланс: {new_balance}\n"
-        f"🔄 Синхронизация: {'готово' if synced else 'ошибка GitHub sync'}\n\n"
-        f"Данные Mini App обновятся после синхронизации GitHub Pages.",
+        f"✅ Операция выполнена\n\n👤 Сотрудник: {target_name}\n💰 {action.capitalize()}: {abs(amount)} спасибок\n🧾 Новый баланс: {new_balance}\n🔄 Синхронизация: {'готово' if synced else 'ошибка GitHub sync'}",
         reply_markup=admin_done_keyboard(),
     )
     return True
@@ -397,36 +384,6 @@ async def app_handler(message: Message):
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
     await safe_answer(message, "Открой бота в личных сообщениях. Там будет кнопка меню «Спасибки» для запуска приложения:", reply_markup=app_keyboard())
-
-
-@router.message(F.web_app_data)
-async def web_app_data_handler(message: Message):
-    if not message.from_user or not is_admin(message.from_user.id):
-        await safe_answer(message, admin_only_text())
-        return
-    try:
-        payload = json.loads(message.web_app_data.data)
-    except Exception:
-        await safe_answer(message, "Не удалось прочитать команду Mini App.")
-        return
-    if payload.get("action") != "admin_change_balance":
-        await safe_answer(message, "Неизвестная команда Mini App.")
-        return
-    try:
-        target_user_id = int(payload.get("target_user_id"))
-        amount = int(payload.get("amount"))
-    except (TypeError, ValueError):
-        await safe_answer(message, "Неверные данные начисления.")
-        return
-    if amount == 0:
-        await safe_answer(message, "Сумма не может быть 0.")
-        return
-    try:
-        new_balance, synced = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
-    except ValueError as error:
-        await safe_answer(message, str(error))
-        return
-    await safe_answer(message, f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}\nСинхронизация: {'готово' if synced else 'ошибка'}", reply_markup=admin_done_keyboard())
 
 
 @router.message(F.new_chat_members)
@@ -510,12 +467,8 @@ async def collect_user_handler(message: Message):
     if amount <= 0:
         await safe_answer(message, "Сумма должна быть больше 0.")
         return
-    if state == "add_balance":
-        real_amount = amount
-        comment = f"Начисление спасибок через админку админом {message.from_user.id}"
-    else:
-        real_amount = -amount
-        comment = f"Списание спасибок через админку админом {message.from_user.id}"
+    real_amount = amount if state == "add_balance" else -amount
+    comment = f"{'Начисление' if real_amount > 0 else 'Списание'} спасибок через админку админом {message.from_user.id}"
     try:
         new_balance, synced = change_balance(user_id, real_amount, comment)
     except ValueError as error:
