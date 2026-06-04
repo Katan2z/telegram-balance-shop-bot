@@ -13,14 +13,10 @@ def normalize_supabase_url(value: str) -> str:
     parsed = urlparse(raw)
     path_parts = [part for part in parsed.path.split("/") if part]
 
-    # Sometimes the dashboard URL is accidentally saved as SUPABASE_URL:
-    # https://supabase.com/dashboard/project/<project-ref>
     if parsed.netloc in {"supabase.com", "www.supabase.com"} and len(path_parts) >= 3:
         if path_parts[0] == "dashboard" and path_parts[1] == "project":
             return f"https://{path_parts[2]}.supabase.co"
 
-    # Old dashboard format:
-    # https://app.supabase.com/project/<project-ref>
     if parsed.netloc == "app.supabase.com" and len(path_parts) >= 2:
         if path_parts[0] == "project":
             return f"https://{path_parts[1]}.supabase.co"
@@ -183,6 +179,38 @@ def list_users() -> list[dict]:
 
 def list_transactions(limit: int = 10) -> list[dict]:
     return request("GET", f"transactions?select=*&order=created_at.desc&limit={limit}") or []
+
+
+def manager_ids() -> set[int]:
+    try:
+        rows = request("GET", "managers?select=telegram_id") or []
+    except RuntimeError as error:
+        print(f"Managers table unavailable: {error}")
+        return set()
+    return {int(row["telegram_id"]) for row in rows if row.get("telegram_id") is not None}
+
+
+def add_manager(user_id: int, created_by: int | None = None) -> None:
+    upsert_unknown_user(user_id)
+    payload = {"telegram_id": user_id, "created_by": created_by, "created_at": now()}
+    request(
+        "POST",
+        "managers?on_conflict=telegram_id",
+        headers=headers("resolution=merge-duplicates"),
+        json=payload,
+    )
+
+
+def remove_manager(user_id: int) -> None:
+    request("DELETE", f"managers?telegram_id=eq.{user_id}")
+
+
+def list_managers() -> list[dict]:
+    try:
+        return request("GET", "managers?select=telegram_id,created_by,created_at&order=created_at.desc") or []
+    except RuntimeError as error:
+        print(f"Managers table unavailable: {error}")
+        return []
 
 
 def get_stats() -> dict:
