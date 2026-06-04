@@ -5,7 +5,7 @@ const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
 const medal = ["🥇", "🥈", "🥉"];
 const BOT_USERNAME = "bk8_shop_bot";
-const ROOT_ADMIN_IDS = ["818748106"];
+const ADMIN_IDS = ["818748106", "747818163", "5311640125"];
 const RAW_DATA_URL = "https://raw.githubusercontent.com/Katan2z/telegram-balance-shop-bot/main/docs/public-data.json";
 
 function setText(id, value) {
@@ -48,17 +48,8 @@ document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", (
 
 function normalizeData(data) {
   data.users = data.users || {};
-  data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
-  data.root_admin_ids = Array.from(new Set([...(data.root_admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
-
-  const existingTop = new Map((data.top_month || []).map(item => [String(item.user_id), Number(item.amount || 0)]));
-  for (const [id, item] of Object.entries(data.users)) {
-    const balance = Number(item.balance || 0);
-    const topAmount = existingTop.get(String(id));
-    if (topAmount !== undefined && topAmount > balance) item.balance = topAmount;
-    item.received_month = Number(item.balance || 0);
-  }
-
+  data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ADMIN_IDS]));
+  data.root_admin_ids = ADMIN_IDS;
   data.top_month = Object.entries(data.users)
     .map(([id, item]) => ({ user_id: id, name: item.name || "Сотрудник", amount: Number(item.balance || 0) }))
     .filter(item => item.amount > 0)
@@ -150,21 +141,17 @@ function isAdmin(data) {
   return Boolean(userId && data.admin_ids && data.admin_ids.map(String).includes(userId));
 }
 
-function ensureAdminTabs() {
+function ensureAdminTab() {
   const tabs = document.getElementById("tabs");
   if (!tabs.querySelector('[data-tab="admin"]')) {
     tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="admin">Админка</button>');
     tabs.querySelector('[data-tab="admin"]').addEventListener("click", () => switchTab("admin"));
   }
-  if (!tabs.querySelector('[data-tab="managers"]')) {
-    tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="managers">Менеджеры</button>');
-    tabs.querySelector('[data-tab="managers"]').addEventListener("click", () => switchTab("managers"));
-  }
 }
 
 function setupAdmin(data) {
   if (!isAdmin(data)) return;
-  ensureAdminTabs();
+  ensureAdminTab();
 
   const select = document.getElementById("adminUser");
   select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
@@ -191,65 +178,12 @@ function setupAdmin(data) {
   document.getElementById("adminRemove").onclick = () => sendChange(-1);
 }
 
-function setupManagers(data) {
-  if (!isAdmin(data)) return;
-  const select = document.getElementById("managerUser");
-  const status = document.getElementById("managerStatus");
-  const managersList = document.getElementById("managersList");
-  const adminIds = new Set((data.admin_ids || []).map(String));
-  const rootAdminIds = new Set((data.root_admin_ids || []).map(String));
-
-  select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
-    const role = adminIds.has(String(id)) ? " · менеджер" : "";
-    return `<option value="${htmlEscape(id)}">${htmlEscape((item.name || "Сотрудник") + role)}</option>`;
-  }).join("");
-
-  document.getElementById("managerAdd").onclick = () => {
-    const targetUserId = select.value;
-    if (!targetUserId) {
-      status.textContent = "Выбери сотрудника";
-      return;
-    }
-    status.textContent = "Открываю бота для выдачи прав";
-    openBotDeepLink(`manager_add_${targetUserId}`);
-  };
-
-  document.getElementById("managerRemove").onclick = () => {
-    const targetUserId = select.value;
-    if (!targetUserId) {
-      status.textContent = "Выбери сотрудника";
-      return;
-    }
-    if (rootAdminIds.has(String(targetUserId))) {
-      status.textContent = "Главного админа нельзя убрать из приложения";
-      return;
-    }
-    status.textContent = "Открываю бота для снятия прав";
-    openBotDeepLink(`manager_remove_${targetUserId}`);
-  };
-
-  const managerRows = Object.entries(data.users || {})
-    .filter(([id]) => adminIds.has(String(id)))
-    .map(([id, item]) => `
-      <div class="rank manager-row">
-        ${avatar(item.name)}
-        <div>
-          <strong>${htmlEscape(item.name || "Сотрудник")}</strong>
-          <span>ID: ${htmlEscape(id)}${rootAdminIds.has(String(id)) ? " · главный админ" : " · менеджер"}</span>
-        </div>
-      </div>
-    `).join("");
-
-  managersList.innerHTML = managerRows || `<p>Менеджеров пока нет.</p>`;
-}
-
 async function refreshData() {
   const data = await loadData();
   renderTop(data.top_month);
   renderHero(data.top_month);
   renderMyStats(data);
   setupAdmin(data);
-  setupManagers(data);
 }
 
 async function main() {
