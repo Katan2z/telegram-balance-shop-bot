@@ -20,6 +20,7 @@ USERS_FILE = DATA_DIR / "users.json"
 PRODUCTS_FILE = DATA_DIR / "products.json"
 TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
 CHATS_FILE = DATA_DIR / "chats.json"
+ADMINS_FILE = DATA_DIR / "admins.json"
 PUBLIC_DATA_FILE = DOCS_DIR / "public-data.json"
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
@@ -55,7 +56,7 @@ def persist_data(message: str = "Update bot data") -> None:
         print(f"GitHub sync failed: {error}")
 
 
-def get_admin_ids() -> set[int]:
+def get_env_admin_ids() -> set[int]:
     raw = os.getenv("ADMIN_IDS", "")
     result = set()
     for item in raw.split(","):
@@ -63,6 +64,28 @@ def get_admin_ids() -> set[int]:
         if item.isdigit():
             result.add(int(item))
     return result
+
+
+def get_extra_admin_ids() -> set[int]:
+    data = read_json(ADMINS_FILE, [])
+    result = set()
+    if isinstance(data, dict):
+        data = data.get("admin_ids", [])
+    for item in data:
+        try:
+            result.add(int(item))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def save_extra_admin_ids(admin_ids: set[int]) -> None:
+    write_json(ADMINS_FILE, sorted(admin_ids))
+    persist_data("Update manager permissions")
+
+
+def get_admin_ids() -> set[int]:
+    return get_env_admin_ids() | get_extra_admin_ids()
 
 
 def is_admin(user_id: int) -> bool:
@@ -108,7 +131,7 @@ def generate_public_data() -> None:
     for user_id, amount in sorted(rating_month.items(), key=lambda item: item[1], reverse=True)[:3]:
         user = users.get(user_id, {})
         top_month.append({"user_id": user_id, "name": public_name(user), "amount": amount})
-    public_data = {"updated_at": now(), "currency_name": "спасибки", "month": current_month, "top_month": top_month, "users": public_users, "admin_ids": [str(admin_id) for admin_id in get_admin_ids()], "products": [product for product in products if product.get("active", True)], "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month}}
+    public_data = {"updated_at": now(), "currency_name": "спасибки", "month": current_month, "top_month": top_month, "users": public_users, "admin_ids": [str(admin_id) for admin_id in get_admin_ids()], "root_admin_ids": [str(admin_id) for admin_id in get_env_admin_ids()], "extra_admin_ids": [str(admin_id) for admin_id in get_extra_admin_ids()], "products": [product for product in products if product.get("active", True)], "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month}}
     write_json(PUBLIC_DATA_FILE, public_data)
 
 
@@ -276,6 +299,33 @@ def get_transactions_text(limit: int = 10) -> str:
 async def handle_start_payload(message: Message, payload: str) -> bool:
     if payload == "app":
         await message.answer("Нажми кнопку меню «Спасибки» рядом с полем ввода, чтобы открыть Mini App.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
+        return True
+    if payload.startswith("manager_"):
+        if not message.from_user or not is_admin(message.from_user.id):
+            await message.answer(admin_only_text())
+            return True
+        parts = payload.split("_")
+        if len(parts) != 3 or parts[1] not in {"add", "remove"}:
+            await message.answer("Неверная команда менеджеров.")
+            return True
+        try:
+            target_user_id = int(parts[2])
+        except ValueError:
+            await message.answer("Неверный user_id менеджера.")
+            return True
+        root_admins = get_env_admin_ids()
+        extra_admins = get_extra_admin_ids()
+        if parts[1] == "add":
+            extra_admins.add(target_user_id)
+            save_extra_admin_ids(extra_admins)
+            await message.answer(f"✅ Менеджер добавлен.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}", reply_markup=admin_done_keyboard())
+            return True
+        if target_user_id in root_admins:
+            await message.answer("Нельзя убрать главного админа из ADMIN_IDS через приложение.")
+            return True
+        extra_admins.discard(target_user_id)
+        save_extra_admin_ids(extra_admins)
+        await message.answer(f"✅ Менеджер убран.\n👤 {get_user_display_name(target_user_id)}\nID: {target_user_id}", reply_markup=admin_done_keyboard())
         return True
     if not payload.startswith("admin_"):
         return False
