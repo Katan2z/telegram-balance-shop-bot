@@ -4,6 +4,7 @@ if (tg) tg.expand();
 const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
 const medal = ["🥇", "🥈", "🥉"];
+const BOT_USERNAME = "bk8_bot";
 
 function setText(id, value) {
   const el = document.getElementById(id);
@@ -121,16 +122,13 @@ function setupAdmin(data) {
       status.textContent = "Укажи сотрудника и сумму";
       return;
     }
-    const payload = {
-      action: "admin_change_balance",
-      target_user_id: Number(targetUserId),
-      amount: direction * amount,
-    };
-    if (tg && tg.sendData) {
-      tg.sendData(JSON.stringify(payload));
-      status.textContent = "Отправлено в бота";
+    const realAmount = direction * amount;
+    const deepLink = `https://t.me/${BOT_USERNAME}?start=admin_${targetUserId}_${realAmount}`;
+    status.textContent = "Открываю бота для подтверждения";
+    if (tg && tg.openTelegramLink) {
+      tg.openTelegramLink(deepLink);
     } else {
-      status.textContent = "Открой через Telegram";
+      window.location.href = deepLink;
     }
   }
 
