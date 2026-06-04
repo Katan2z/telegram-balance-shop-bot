@@ -80,6 +80,15 @@ function normalizeData(data) {
   return data;
 }
 
+function preserveSelectValue(select, html) {
+  if (!select) return;
+  const previousValue = select.value;
+  select.innerHTML = html;
+  if (previousValue && [...select.options].some(option => option.value === previousValue)) {
+    select.value = previousValue;
+  }
+}
+
 async function loadSupabaseData() {
   const [usersRows, managerRows] = await Promise.all([
     supabaseFetch("users?select=telegram_id,username,first_name,last_name,balance,updated_at&order=balance.desc"),
@@ -210,10 +219,11 @@ function setupAdmin(data) {
   ensureAdminTabs(data);
 
   const select = document.getElementById("adminUser");
-  select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
+  const optionsHtml = Object.entries(data.users || {}).map(([id, item]) => {
     const label = `${item.name || "Сотрудник"} · баланс ${item.balance || 0}`;
     return `<option value="${htmlEscape(id)}">${htmlEscape(label)}</option>`;
   }).join("");
+  preserveSelectValue(select, optionsHtml);
 
   const amountInput = document.getElementById("adminAmount");
   const status = document.getElementById("adminStatus");
@@ -245,10 +255,11 @@ function setupManagers(data) {
   const adminIds = new Set((data.admin_ids || []).map(String));
   const rootIds = new Set((data.root_admin_ids || []).map(String));
 
-  select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
+  const optionsHtml = Object.entries(data.users || {}).map(([id, item]) => {
     const role = rootIds.has(id) ? " · главный админ" : (adminIds.has(id) ? " · менеджер" : "");
     return `<option value="${htmlEscape(id)}">${htmlEscape((item.name || "Сотрудник") + role)}</option>`;
   }).join("");
+  preserveSelectValue(select, optionsHtml);
 
   document.getElementById("managerAdd").onclick = () => {
     const targetUserId = select.value;
