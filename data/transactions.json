@@ -215,5 +215,12 @@
     "type": "balance_change",
     "comment": "Изменение через Mini App админом 5311640125",
     "created_at": "2026-06-04T12:44:22.968735"
+  },
+  {
+    "user_id": 747818163,
+    "amount": 10,
+    "type": "balance_change",
+    "comment": "Изменение через Mini App админом 5311640125",
+    "created_at": "2026-06-04T12:44:32.552406"
   }
 ]
