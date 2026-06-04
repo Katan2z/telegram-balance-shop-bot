@@ -4,7 +4,7 @@ if (tg) tg.expand();
 const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
 const medal = ["🥇", "🥈", "🥉"];
-const BOT_USERNAME = "bk8_bot";
+const BOT_USERNAME = "bk8_shop_bot";
 
 function setText(id, value) {
   const el = document.getElementById(id);
