@@ -22,7 +22,7 @@ TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
 CHATS_FILE = DATA_DIR / "chats.json"
 PUBLIC_DATA_FILE = DOCS_DIR / "public-data.json"
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_bot")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
 
 ADMIN_STATES: dict[int, str] = {}
 
