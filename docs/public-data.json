@@ -1,56 +1,44 @@
 {
-  "updated_at": "2026-06-04T13:20:48.633418",
+  "updated_at": "2026-06-04T13:24:15.017731",
   "currency_name": "спасибки",
   "month": "2026-06",
   "top_month": [
     {
       "user_id": "747818163",
       "name": "Анна",
-      "amount": 25
-    },
-    {
-      "user_id": "5311640125",
-      "name": "Matvei",
-      "amount": 0
+      "amount": 355
     },
     {
       "user_id": "818748106",
       "name": "Костя",
-      "amount": -5
+      "amount": 120
+    },
+    {
+      "user_id": "5311640125",
+      "name": "Matvei",
+      "amount": 93
     }
   ],
   "users": {
     "818748106": {
       "name": "Костя",
       "balance": 0,
-      "received_month": -5,
-      "received_total": 0
+      "received_month": 120,
+      "received_total": 125
     },
     "5311640125": {
       "name": "Matvei",
       "balance": 0,
-      "received_month": 0,
-      "received_total": 0
+      "received_month": 93,
+      "received_total": 93
     },
     "747818163": {
       "name": "Анна",
       "balance": 25,
-      "received_month": 25,
-      "received_total": 25
+      "received_month": 355,
+      "received_total": 355
     }
   },
-  "admin_ids": [
-    "818748106",
-    "747818163",
-    "5311640125"
-  ],
-  "root_admin_ids": [
-    "818748106"
-  ],
-  "extra_admin_ids": [
-    "747818163",
-    "5311640125"
-  ],
   "products": [
     {
       "id": 1,
@@ -63,6 +51,6 @@
   "stats": {
     "users_count": 3,
     "transactions_count": 40,
-    "total_given_month": 20
+    "total_given_month": 568
   }
 }
