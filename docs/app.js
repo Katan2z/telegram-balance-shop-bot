@@ -5,6 +5,7 @@ const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
 const medal = ["🥇", "🥈", "🥉"];
 const BOT_USERNAME = "bk8_shop_bot";
+const ROOT_ADMIN_IDS = ["818748106"];
 const RAW_DATA_URL = "https://raw.githubusercontent.com/Katan2z/telegram-balance-shop-bot/main/docs/public-data.json";
 
 function setText(id, value) {
@@ -45,21 +46,42 @@ function switchTab(tabName) {
 
 document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
+function normalizeData(data) {
+  data.users = data.users || {};
+  data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
+  data.root_admin_ids = Array.from(new Set([...(data.root_admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
+
+  const existingTop = new Map((data.top_month || []).map(item => [String(item.user_id), Number(item.amount || 0)]));
+  for (const [id, item] of Object.entries(data.users)) {
+    const balance = Number(item.balance || 0);
+    const topAmount = existingTop.get(String(id));
+    if (topAmount !== undefined && topAmount > balance) item.balance = topAmount;
+    item.received_month = Number(item.balance || 0);
+  }
+
+  data.top_month = Object.entries(data.users)
+    .map(([id, item]) => ({ user_id: id, name: item.name || "Сотрудник", amount: Number(item.balance || 0) }))
+    .filter(item => item.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 3);
+  return data;
+}
+
 async function loadData() {
   try {
     const response = await fetch(`${RAW_DATA_URL}?v=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error("Raw data unavailable");
-    return response.json();
+    return normalizeData(await response.json());
   } catch (error) {
     const response = await fetch(`public-data.json?v=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error("Данные временно недоступны");
-    return response.json();
+    return normalizeData(await response.json());
   }
 }
 
 function getUserRank(data, currentUserId) {
   const rows = Object.entries(data.users || {})
-    .map(([id, item]) => ({ id, amount: Number(item.received_month || 0) }))
+    .map(([id, item]) => ({ id, amount: Number(item.balance || 0) }))
     .filter(row => row.amount > 0)
     .sort((a, b) => b.amount - a.amount);
   const index = rows.findIndex(row => row.id === currentUserId);
@@ -78,7 +100,7 @@ function renderTop(items) {
       ${avatar(item.name)}
       <div>
         <strong>${htmlEscape(item.name || "Сотрудник")}</strong>
-        <span>${Number(item.amount || 0)} спасибок за месяц</span>
+        <span>${Number(item.amount || 0)} спасибок</span>
       </div>
     </div>
   `).join("");
@@ -96,7 +118,7 @@ function renderHero(items) {
     <div class="hero-person">
       ${avatar(hero.name, "hero-avatar")}
       <strong>${htmlEscape(hero.name || "Сотрудник")}</strong>
-      <span>👑 ${amount} спасибок за месяц</span>
+      <span>👑 ${amount} спасибок</span>
       <div class="progress"><i style="width:${Math.min(100, Math.max(8, amount))}%"></i></div>
     </div>
   `;
@@ -107,25 +129,25 @@ function renderMyStats(data) {
   const publicUser = userId ? data.users?.[userId] : null;
   if (!userId || !publicUser) {
     root.innerHTML = `<p>Нет данных. Открой приложение через Telegram и нажми /start у бота.</p>`;
+    setText("balance", 0);
     return;
   }
   const rank = getUserRank(data, userId);
   const balance = Number(publicUser.balance || 0);
-  const month = Number(publicUser.received_month || 0);
-  const total = Number(publicUser.received_total || 0);
+  const total = Number(publicUser.received_total || balance || 0);
   setText("balance", balance);
   root.innerHTML = `
     <div class="stat-grid">
       <div class="stat-tile"><small>Баланс</small><strong>${balance}</strong><span>доступно</span></div>
       <div class="stat-tile"><small>Место</small><strong>${rank ? `#${rank}` : "—"}</strong><span>в рейтинге</span></div>
-      <div class="stat-tile"><small>За месяц</small><strong>${month}</strong><span>результат</span></div>
+      <div class="stat-tile"><small>Результат</small><strong>${balance}</strong><span>сейчас</span></div>
       <div class="stat-tile"><small>Всего</small><strong>${total}</strong><span>за всё время</span></div>
     </div>
   `;
 }
 
 function isAdmin(data) {
-  return Boolean(userId && data.admin_ids && data.admin_ids.includes(userId));
+  return Boolean(userId && data.admin_ids && data.admin_ids.map(String).includes(userId));
 }
 
 function ensureAdminTabs() {
