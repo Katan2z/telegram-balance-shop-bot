@@ -45,6 +45,24 @@ def request(method: str, path: str, **kwargs) -> Any:
     return None
 
 
+def upsert_user_record(record: dict) -> dict:
+    payload = {
+        "telegram_id": int(record["telegram_id"]),
+        "username": record.get("username"),
+        "first_name": record.get("first_name"),
+        "last_name": record.get("last_name"),
+        "balance": int(record.get("balance", 0) or 0),
+        "updated_at": record.get("updated_at") or now(),
+    }
+    rows = request(
+        "POST",
+        "users?on_conflict=telegram_id",
+        headers=headers("resolution=merge-duplicates,return=representation"),
+        json=payload,
+    )
+    return rows[0] if rows else payload
+
+
 def upsert_user(user) -> dict:
     payload = {
         "telegram_id": user.id,
@@ -92,26 +110,6 @@ def save_chat(chat) -> None:
     )
 
 
-def add_transaction(user_id: int, amount: int, admin_id: int | None = None, comment: str = "") -> int:
-    upsert_unknown_user(user_id)
-    payload = {
-        "user_id": user_id,
-        "amount": amount,
-        "type": "balance_change",
-        "comment": comment,
-        "admin_id": admin_id,
-        "created_at": now(),
-    }
-    rows = request(
-        "POST",
-        "transactions",
-        headers=headers("return=representation"),
-        json=payload,
-    )
-    user_rows = request("GET", f"users?telegram_id=eq.{user_id}&select=balance")
-    return int(user_rows[0].get("balance", 0)) if user_rows else 0
-
-
 def change_balance(user_id: int, amount: int, admin_id: int | None = None, comment: str = "") -> int:
     if amount == 0:
         raise ValueError("Сумма не может быть 0")
@@ -120,7 +118,16 @@ def change_balance(user_id: int, amount: int, admin_id: int | None = None, comme
     current_balance = int(user_rows[0].get("balance", 0)) if user_rows else 0
     if current_balance + amount < 0:
         raise ValueError("Недостаточно средств")
-    return add_transaction(user_id, amount, admin_id=admin_id, comment=comment)
+    payload = {
+        "user_id": user_id,
+        "amount": amount,
+        "type": "balance_change",
+        "comment": comment,
+        "admin_id": admin_id,
+        "created_at": now(),
+    }
+    request("POST", "transactions", headers=headers("return=representation"), json=payload)
+    return get_balance(user_id)
 
 
 def get_balance(user_id: int) -> int:
