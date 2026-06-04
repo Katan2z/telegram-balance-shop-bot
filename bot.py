@@ -8,7 +8,7 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from storage import sync_files_to_github
 
@@ -22,6 +22,7 @@ TRANSACTIONS_FILE = DATA_DIR / "transactions.json"
 CHATS_FILE = DATA_DIR / "chats.json"
 PUBLIC_DATA_FILE = DOCS_DIR / "public-data.json"
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
 
 ADMIN_STATES: dict[int, str] = {}
 
@@ -196,7 +197,7 @@ def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
 
 
 def app_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть Спасибки", web_app=WebAppInfo(url=MINI_APP_URL))]])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть бота", url=f"https://t.me/{BOT_USERNAME}?start=app")]])
 
 
 def admin_keyboard() -> InlineKeyboardMarkup:
@@ -264,7 +265,7 @@ async def start_handler(message: Message):
     if message.from_user:
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
-    await message.answer("Привет! Это мотивационный магазин спасибок.\n\nВыбери действие:", reply_markup=main_menu(message.from_user.id if message.from_user else None))
+    await message.answer("Привет! Это мотивационный магазин спасибок.\n\nЧтобы открыть полноценное Mini App, нажми кнопку меню «Спасибки» рядом с полем ввода.", reply_markup=main_menu(message.from_user.id if message.from_user else None))
 
 
 @router.message(Command("app"))
@@ -272,7 +273,7 @@ async def app_handler(message: Message):
     if message.from_user:
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
-    await message.answer("Открыть мини-приложение:", reply_markup=app_keyboard())
+    await message.answer("Открой бота в личных сообщениях. Там будет кнопка меню «Спасибки» для запуска приложения:", reply_markup=app_keyboard())
 
 
 @router.message(F.web_app_data)
@@ -417,7 +418,7 @@ async def balance_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data == "help")
 async def help_callback(callback: CallbackQuery):
-    await callback.message.edit_text("ℹ️ Помощь\n\n🚀 Открыть приложение — ссылка на приложение.\n/app — попробовать открыть как Mini App.\n💰 Баланс — проверить спасибки.\n\nАдмин-команды:\n/admin — открыть админку\n/add_balance user_id amount — начислить спасибки\n/users — список пользователей\n/sync — обновить данные Mini App", reply_markup=main_menu(callback.from_user.id))
+    await callback.message.edit_text("ℹ️ Помощь\n\n/app — открыть бота в личных сообщениях.\n💰 Баланс — проверить спасибки.\n\nАдмин-команды:\n/admin — открыть админку\n/add_balance user_id amount — начислить спасибки\n/users — список пользователей\n/sync — обновить данные Mini App", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
 
 
