@@ -67,6 +67,22 @@
         </div>
       </article>
     </section>
+
+    <section class="tab-page" id="tab-managers">
+      <article class="card managers-panel">
+        <h2>👑 Менеджеры</h2>
+        <div class="admin-form">
+          <label>Сотрудник</label>
+          <select id="managerUser"></select>
+          <div class="admin-actions">
+            <button id="managerAdd" class="action-btn add">+ Дать админку</button>
+            <button id="managerRemove" class="action-btn remove">− Забрать</button>
+          </div>
+          <p id="managerStatus" class="admin-status"></p>
+        </div>
+        <div id="managersList" class="list managers-list"></div>
+      </article>
+    </section>
   </main>
 
   <script src="app.js"></script>
