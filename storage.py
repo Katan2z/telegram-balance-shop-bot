@@ -11,6 +11,7 @@ PATHS_TO_SYNC = [
     "data/users.json",
     "data/transactions.json",
     "data/chats.json",
+    "data/admins.json",
     "docs/public-data.json",
 ]
 
