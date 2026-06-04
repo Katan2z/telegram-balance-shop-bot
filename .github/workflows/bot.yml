@@ -29,10 +29,33 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Generate mini app config
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python create_frontend_config.py
+
+      - name: Save mini app config
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add docs/config.js
+          git diff --cached --quiet || git commit -m "Update mini app config"
+          git push || true
+
+      - name: Migrate users to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python migrate_to_supabase.py
+
       - name: Run bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           ADMIN_IDS: ${{ secrets.ADMIN_IDS }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: main
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: python bot.py
