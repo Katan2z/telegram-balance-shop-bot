@@ -206,7 +206,7 @@ def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
 
 
 def app_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть приложение", url=MINI_APP_URL)]])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🚀 Открыть приложение", url=bot_private_url())]])
 
 
 def admin_keyboard() -> InlineKeyboardMarkup:
@@ -222,7 +222,7 @@ def admin_keyboard() -> InlineKeyboardMarkup:
 
 def admin_done_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="↩️ Вернуться в приложение", url=MINI_APP_URL)],
+        [InlineKeyboardButton(text="↩️ Вернуться в бота", url=bot_private_url())],
         [InlineKeyboardButton(text="👑 Админка в боте", callback_data="admin")],
     ])
 
