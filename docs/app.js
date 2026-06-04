@@ -75,22 +75,6 @@ function renderHero(items) {
   `;
 }
 
-function renderProducts(products) {
-  const root = document.getElementById("products");
-  const activeProducts = (products || []).filter(product => product.active !== false);
-  if (activeProducts.length === 0) {
-    root.innerHTML = `<p>Магазин пуст.</p>`;
-    return;
-  }
-  root.innerHTML = activeProducts.map(product => `
-    <div class="product">
-      <strong>${htmlEscape(product.name)}</strong>
-      <span>${htmlEscape(product.description || "")}</span>
-      <div class="pill">${Number(product.price || 0)} спасибок</div>
-    </div>
-  `).join("");
-}
-
 function renderMyStats(data) {
   const root = document.getElementById("myStats");
   const publicUser = userId ? data.users?.[userId] : null;
@@ -108,18 +92,63 @@ function renderMyStats(data) {
   `;
 }
 
+function isAdmin(data) {
+  return Boolean(userId && data.admin_ids && data.admin_ids.includes(userId));
+}
+
+function setupAdmin(data) {
+  if (!isAdmin(data)) return;
+
+  const tabs = document.getElementById("tabs");
+  if (!tabs.querySelector('[data-tab="admin"]')) {
+    tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="admin">Админка</button>');
+    tabs.querySelector('[data-tab="admin"]').addEventListener("click", () => switchTab("admin"));
+  }
+
+  const select = document.getElementById("adminUser");
+  select.innerHTML = Object.entries(data.users || {}).map(([id, item]) => {
+    const label = `${item.name || "Сотрудник"} · ${item.balance || 0}`;
+    return `<option value="${htmlEscape(id)}">${htmlEscape(label)}</option>`;
+  }).join("");
+
+  const amountInput = document.getElementById("adminAmount");
+  const status = document.getElementById("adminStatus");
+
+  function sendChange(direction) {
+    const targetUserId = select.value;
+    const amount = Number(amountInput.value || 0);
+    if (!targetUserId || !amount || amount <= 0) {
+      status.textContent = "Укажи сотрудника и сумму";
+      return;
+    }
+    const payload = {
+      action: "admin_change_balance",
+      target_user_id: Number(targetUserId),
+      amount: direction * amount,
+    };
+    if (tg && tg.sendData) {
+      tg.sendData(JSON.stringify(payload));
+      status.textContent = "Отправлено в бота";
+    } else {
+      status.textContent = "Открой через Telegram";
+    }
+  }
+
+  document.getElementById("adminAdd").onclick = () => sendChange(1);
+  document.getElementById("adminRemove").onclick = () => sendChange(-1);
+}
+
 async function main() {
   setText("userName", user ? `${user.first_name}` : "Спасибки");
   try {
     const data = await loadData();
     renderTop(data.top_month);
     renderHero(data.top_month);
-    renderProducts(data.products);
     renderMyStats(data);
+    setupAdmin(data);
   } catch (error) {
     document.getElementById("topMonth").innerHTML = `<p>Нет данных.</p>`;
     document.getElementById("myStats").innerHTML = `<p>Нет данных.</p>`;
-    document.getElementById("products").innerHTML = `<p>Нет данных.</p>`;
   }
 }
 
