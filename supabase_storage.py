@@ -1,10 +1,34 @@
 import os
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+
+def normalize_supabase_url(value: str) -> str:
+    raw = (value or "").strip().rstrip("/")
+    if not raw:
+        return ""
+    parsed = urlparse(raw)
+    path_parts = [part for part in parsed.path.split("/") if part]
+
+    # Sometimes the dashboard URL is accidentally saved as SUPABASE_URL:
+    # https://supabase.com/dashboard/project/<project-ref>
+    if parsed.netloc in {"supabase.com", "www.supabase.com"} and len(path_parts) >= 3:
+        if path_parts[0] == "dashboard" and path_parts[1] == "project":
+            return f"https://{path_parts[2]}.supabase.co"
+
+    # Old dashboard format:
+    # https://app.supabase.com/project/<project-ref>
+    if parsed.netloc == "app.supabase.com" and len(path_parts) >= 2:
+        if path_parts[0] == "project":
+            return f"https://{path_parts[1]}.supabase.co"
+
+    return raw
+
+
+SUPABASE_URL = normalize_supabase_url(os.getenv("SUPABASE_URL", ""))
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or ""
 
 DEFAULT_TIMEOUT = 15
@@ -36,10 +60,16 @@ def headers(prefer: str | None = None) -> dict[str, str]:
 
 
 def request(method: str, path: str, **kwargs) -> Any:
+    if not SUPABASE_URL.endswith(".supabase.co"):
+        raise RuntimeError(
+            "SUPABASE_URL должен быть Project URL вида https://PROJECT_REF.supabase.co, "
+            "а не ссылкой на dashboard."
+        )
     url = f"{SUPABASE_URL}/rest/v1/{path}"
     response = requests.request(method, url, headers=kwargs.pop("headers", headers()), timeout=DEFAULT_TIMEOUT, **kwargs)
     if response.status_code >= 400:
-        raise RuntimeError(f"Supabase {method} {path} failed: {response.status_code} {response.text}")
+        body = response.text[:1000]
+        raise RuntimeError(f"Supabase {method} {path} failed: {response.status_code} {body}")
     if response.text:
         return response.json()
     return None
