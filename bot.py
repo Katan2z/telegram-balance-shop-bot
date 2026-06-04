@@ -87,26 +87,25 @@ def generate_public_data() -> None:
     products = read_json(PRODUCTS_FILE, [])
     transactions = read_json(TRANSACTIONS_FILE, [])
     current_month = month_key()
-    received_total = defaultdict(int)
-    received_month = defaultdict(int)
+    rating_total = defaultdict(int)
+    rating_month = defaultdict(int)
     total_given_month = 0
     for tx in transactions:
         user_id = str(tx.get("user_id"))
         amount = int(tx.get("amount", 0) or 0)
         created_at = str(tx.get("created_at", ""))
         comment = str(tx.get("comment", ""))
-        is_positive_reward = amount > 0 and "Списание" not in comment and "Покупка" not in comment
-        if not is_positive_reward:
+        if "Покупка" in comment:
             continue
-        received_total[user_id] += amount
+        rating_total[user_id] += amount
         if created_at.startswith(current_month):
-            received_month[user_id] += amount
+            rating_month[user_id] += amount
             total_given_month += amount
     public_users = {}
     for user_id, user in users.items():
-        public_users[user_id] = {"name": public_name(user), "balance": int(user.get("balance", 0) or 0), "received_month": received_month[user_id], "received_total": received_total[user_id]}
+        public_users[user_id] = {"name": public_name(user), "balance": int(user.get("balance", 0) or 0), "received_month": rating_month[user_id], "received_total": rating_total[user_id]}
     top_month = []
-    for user_id, amount in sorted(received_month.items(), key=lambda item: item[1], reverse=True)[:3]:
+    for user_id, amount in sorted(rating_month.items(), key=lambda item: item[1], reverse=True)[:3]:
         user = users.get(user_id, {})
         top_month.append({"user_id": user_id, "name": public_name(user), "amount": amount})
     public_data = {"updated_at": now(), "currency_name": "спасибки", "month": current_month, "top_month": top_month, "users": public_users, "admin_ids": [str(admin_id) for admin_id in get_admin_ids()], "products": [product for product in products if product.get("active", True)], "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month}}
@@ -261,7 +260,7 @@ def get_stats_text() -> str:
     chats = read_json(CHATS_FILE, {})
     public_data = read_json(PUBLIC_DATA_FILE, {})
     total_balance = sum(int(user.get("balance", 0)) for user in users.values())
-    return ("📊 Статистика\n\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Операций: {len(transactions)}\n" f"Выдано за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
+    return ("📊 Статистика\n\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Операций: {len(transactions)}\n" f"Рейтинг за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
 
 
 def get_transactions_text(limit: int = 10) -> str:
