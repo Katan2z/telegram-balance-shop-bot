@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-04T01:57:18.343689",
+  "updated_at": "2026-06-04T01:57:21.915111",
   "currency_name": "спасибки",
   "month": "2026-06",
   "top_month": [
@@ -16,7 +16,7 @@
     {
       "user_id": "5311640125",
       "name": "Matvei",
-      "amount": 25
+      "amount": 79
     }
   ],
   "users": {
@@ -28,9 +28,9 @@
     },
     "5311640125": {
       "name": "Matvei",
-      "balance": 0,
-      "received_month": 25,
-      "received_total": 25
+      "balance": 54,
+      "received_month": 79,
+      "received_total": 79
     },
     "747818163": {
       "name": "Анна",
@@ -53,7 +53,7 @@
   ],
   "stats": {
     "users_count": 3,
-    "transactions_count": 9,
-    "total_given_month": 303
+    "transactions_count": 10,
+    "total_given_month": 357
   }
 }
