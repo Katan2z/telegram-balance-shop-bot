@@ -5,6 +5,7 @@ const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
 const medal = ["🥇", "🥈", "🥉"];
 const BOT_USERNAME = "bk8_shop_bot";
+const RAW_DATA_URL = "https://raw.githubusercontent.com/Katan2z/telegram-balance-shop-bot/main/docs/public-data.json";
 
 function setText(id, value) {
   const el = document.getElementById(id);
@@ -45,9 +46,15 @@ function switchTab(tabName) {
 document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
 async function loadData() {
-  const response = await fetch(`public-data.json?v=${Date.now()}`);
-  if (!response.ok) throw new Error("Данные временно недоступны");
-  return response.json();
+  try {
+    const response = await fetch(`${RAW_DATA_URL}?v=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Raw data unavailable");
+    return response.json();
+  } catch (error) {
+    const response = await fetch(`public-data.json?v=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Данные временно недоступны");
+    return response.json();
+  }
 }
 
 function getUserRank(data, currentUserId) {
@@ -214,15 +221,23 @@ function setupManagers(data) {
   managersList.innerHTML = managerRows || `<p>Менеджеров пока нет.</p>`;
 }
 
+async function refreshData() {
+  const data = await loadData();
+  renderTop(data.top_month);
+  renderHero(data.top_month);
+  renderMyStats(data);
+  setupAdmin(data);
+  setupManagers(data);
+}
+
 async function main() {
   setText("userName", user ? `${user.first_name}` : "Спасибки");
   try {
-    const data = await loadData();
-    renderTop(data.top_month);
-    renderHero(data.top_month);
-    renderMyStats(data);
-    setupAdmin(data);
-    setupManagers(data);
+    await refreshData();
+    setInterval(() => refreshData().catch(() => {}), 10000);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshData().catch(() => {});
+    });
   } catch (error) {
     document.getElementById("topMonth").innerHTML = `<p>Нет данных.</p>`;
     document.getElementById("myStats").innerHTML = `<p>Нет данных.</p>`;
