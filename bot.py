@@ -86,7 +86,6 @@ def generate_public_data() -> None:
     products = read_json(PRODUCTS_FILE, [])
     transactions = read_json(TRANSACTIONS_FILE, [])
     current_month = month_key()
-
     received_total = defaultdict(int)
     received_month = defaultdict(int)
     total_given_month = 0
@@ -124,6 +123,7 @@ def generate_public_data() -> None:
         "month": current_month,
         "top_month": top_month,
         "users": public_users,
+        "admin_ids": [str(admin_id) for admin_id in get_admin_ids()],
         "products": [product for product in products if product.get("active", True)],
         "stats": {"users_count": len(users), "transactions_count": len(transactions), "total_given_month": total_given_month},
     }
@@ -134,15 +134,7 @@ def save_user(user) -> dict:
     users = read_json(USERS_FILE, {})
     telegram_id = str(user.id)
     if telegram_id not in users:
-        users[telegram_id] = {
-            "telegram_id": user.id,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "balance": 0,
-            "created_at": now(),
-            "updated_at": now(),
-        }
+        users[telegram_id] = {"telegram_id": user.id, "username": user.username, "first_name": user.first_name, "last_name": user.last_name, "balance": 0, "created_at": now(), "updated_at": now()}
     else:
         users[telegram_id]["username"] = user.username
         users[telegram_id]["first_name"] = user.first_name
@@ -230,19 +222,10 @@ def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="🚀 Открыть приложение", url=MINI_APP_URL)],
         [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
-        [InlineKeyboardButton(text="🛒 Магазин", callback_data="shop")],
         [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
     ]
     if user_id and is_admin(user_id):
         buttons.append([InlineKeyboardButton(text="👑 Админка", callback_data="admin")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
-def shop_keyboard() -> InlineKeyboardMarkup:
-    buttons = []
-    for product in get_products():
-        buttons.append([InlineKeyboardButton(text=f"{product['name']} — {product['price']}", callback_data=f"buy:{product['id']}")])
-    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -291,15 +274,7 @@ def get_stats_text() -> str:
     chats = read_json(CHATS_FILE, {})
     public_data = read_json(PUBLIC_DATA_FILE, {})
     total_balance = sum(int(user.get("balance", 0)) for user in users.values())
-    return (
-        "📊 Статистика\n\n"
-        f"Пользователей: {len(users)}\n"
-        f"Чатов: {len(chats)}\n"
-        f"Товаров: {len(products)}\n"
-        f"Операций: {len(transactions)}\n"
-        f"Выдано за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n"
-        f"Общий баланс пользователей: {total_balance}"
-    )
+    return ("📊 Статистика\n\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Товаров: {len(products)}\n" f"Операций: {len(transactions)}\n" f"Выдано за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
 
 
 def get_transactions_text(limit: int = 10) -> str:
@@ -321,6 +296,36 @@ async def start_handler(message: Message):
         save_user(message.from_user)
         save_chat_member(message.chat, message.from_user)
     await message.answer("Привет! Это мотивационный магазин спасибок.\n\nВыбери действие:", reply_markup=main_menu(message.from_user.id if message.from_user else None))
+
+
+@router.message(F.web_app_data)
+async def web_app_data_handler(message: Message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        await message.answer(admin_only_text())
+        return
+    try:
+        payload = json.loads(message.web_app_data.data)
+    except Exception:
+        await message.answer("Не удалось прочитать команду Mini App.")
+        return
+    if payload.get("action") != "admin_change_balance":
+        await message.answer("Неизвестная команда Mini App.")
+        return
+    try:
+        target_user_id = int(payload.get("target_user_id"))
+        amount = int(payload.get("amount"))
+    except (TypeError, ValueError):
+        await message.answer("Неверные данные начисления.")
+        return
+    if amount == 0:
+        await message.answer("Сумма не может быть 0.")
+        return
+    try:
+        new_balance = change_balance(target_user_id, amount, f"Изменение через Mini App админом {message.from_user.id}")
+    except ValueError as error:
+        await message.answer(str(error))
+        return
+    await message.answer(f"✅ Готово.\nПользователь: {target_user_id}\nИзменение: {amount}\nНовый баланс: {new_balance}")
 
 
 @router.message(F.new_chat_members)
@@ -433,46 +438,10 @@ async def balance_callback(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == "shop")
-async def shop_callback(callback: CallbackQuery):
-    products = get_products()
-    if not products:
-        await callback.message.edit_text("🛒 Магазин пока пуст.", reply_markup=main_menu(callback.from_user.id))
-    else:
-        text = "🛒 Магазин призов:\n\n"
-        for product in products:
-            text += f"#{product['id']} — {product['name']}\n{product.get('description', '')}\nЦена: {product['price']} спасибок\n\n"
-        await callback.message.edit_text(text, reply_markup=shop_keyboard())
-    await callback.answer()
-
-
 @router.callback_query(F.data == "help")
 async def help_callback(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "ℹ️ Помощь\n\n"
-        "🚀 Открыть приложение — Mini App со статистикой.\n"
-        "💰 Баланс — проверить спасибки.\n"
-        "🛒 Магазин — посмотреть призы.\n\n"
-        "Админ-команды:\n"
-        "/admin — открыть админку\n"
-        "/add_balance user_id amount — начислить спасибки\n"
-        "/users — список пользователей\n"
-        "/sync — обновить данные Mini App",
-        reply_markup=main_menu(callback.from_user.id),
-    )
+    await callback.message.edit_text("ℹ️ Помощь\n\n🚀 Открыть приложение — Mini App со статистикой.\n💰 Баланс — проверить спасибки.\n\nАдмин-команды:\n/admin — открыть админку\n/add_balance user_id amount — начислить спасибки\n/users — список пользователей\n/sync — обновить данные Mini App", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
-
-
-@router.callback_query(F.data.startswith("buy:"))
-async def buy_callback(callback: CallbackQuery):
-    product_id = int(callback.data.split(":")[1])
-    try:
-        product = buy_product(callback.from_user.id, product_id)
-    except ValueError as error:
-        await callback.answer(str(error), show_alert=True)
-        return
-    await callback.message.edit_text(f"✅ Покупка успешна!\n\nТовар: {product['name']}\nСписано: {product['price']}\nБаланс: {get_balance(callback.from_user.id)}", reply_markup=main_menu(callback.from_user.id))
-    await callback.answer("Покупка успешна!")
 
 
 @router.callback_query(F.data == "admin")
