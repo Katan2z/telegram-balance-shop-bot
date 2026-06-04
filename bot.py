@@ -8,7 +8,7 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 
 from storage import sync_files_to_github
 
@@ -202,25 +202,9 @@ def get_balance(user_id: int) -> int:
     return int(users.get(str(user_id), {}).get("balance", 0))
 
 
-def get_products() -> list[dict]:
-    products = read_json(PRODUCTS_FILE, [])
-    return [product for product in products if product.get("active", True)]
-
-
-def buy_product(user_id: int, product_id: int) -> dict:
-    product = next((item for item in get_products() if int(item["id"]) == product_id), None)
-    if product is None:
-        raise ValueError("Товар не найден")
-    price = int(product["price"])
-    if get_balance(user_id) < price:
-        raise ValueError("Недостаточно средств")
-    change_balance(user_id, -price, f"Покупка товара: {product['name']}")
-    return product
-
-
 def main_menu(user_id: int | None = None) -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(text="🚀 Открыть приложение", url=MINI_APP_URL)],
+        [InlineKeyboardButton(text="🚀 Открыть приложение", web_app=WebAppInfo(url=MINI_APP_URL))],
         [InlineKeyboardButton(text="💰 Баланс", callback_data="balance")],
         [InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")],
     ]
@@ -269,12 +253,11 @@ def get_users_text(limit: int = 20) -> str:
 def get_stats_text() -> str:
     persist_data("Update statistics")
     users = read_json(USERS_FILE, {})
-    products = read_json(PRODUCTS_FILE, [])
     transactions = read_json(TRANSACTIONS_FILE, [])
     chats = read_json(CHATS_FILE, {})
     public_data = read_json(PUBLIC_DATA_FILE, {})
     total_balance = sum(int(user.get("balance", 0)) for user in users.values())
-    return ("📊 Статистика\n\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Товаров: {len(products)}\n" f"Операций: {len(transactions)}\n" f"Выдано за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
+    return ("📊 Статистика\n\n" f"Пользователей: {len(users)}\n" f"Чатов: {len(chats)}\n" f"Операций: {len(transactions)}\n" f"Выдано за месяц: {public_data.get('stats', {}).get('total_given_month', 0)}\n" f"Общий баланс пользователей: {total_balance}")
 
 
 def get_transactions_text(limit: int = 10) -> str:
