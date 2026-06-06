@@ -79,6 +79,18 @@
 .task-card.overdue .task-card-head small,
 .task-card.overdue .task-card-head strong { color: var(--red); }
 .task-card p { margin: 10px 0 0; color: rgba(50, 22, 14, .78); font-weight: 900; line-height: 1.35; }
+.task-card-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.task-delete-icon {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--red);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(216, 39, 22, .18);
+}
 .task-check { position: relative; flex: 0 0 auto; cursor: pointer; }
 .task-check input { position: absolute; opacity: 0; pointer-events: none; }
 .task-check span {
