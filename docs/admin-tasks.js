@@ -183,6 +183,7 @@ function taskCard(task) {
         <div><span>Создал</span><strong>${taskEscape(creator)}</strong></div>
         ${completed ? `<div><span>Закрыл</span><strong>${taskEscape(completedBy)} · ${taskEscape(completedAt)}</strong></div>` : ""}
       </div>
+      ${completed ? `<button class="task-delete" data-task-delete="${task.id}">Удалить выполненную задачу</button>` : ""}
     </article>
   `;
 }
@@ -200,6 +201,9 @@ function tasksRender() {
 
   document.querySelectorAll("[data-task-toggle]").forEach(input => {
     input.onchange = () => tasksToggle(Number(input.dataset.taskToggle), input.checked);
+  });
+  document.querySelectorAll("[data-task-delete]").forEach(button => {
+    button.onclick = () => tasksDelete(Number(button.dataset.taskDelete));
   });
 }
 
@@ -256,6 +260,25 @@ async function tasksToggle(taskId, checked) {
     await tasksLoad();
   } catch (error) {
     status.textContent = "Не получилось обновить задачу.";
+  }
+}
+
+async function tasksDelete(taskId) {
+  const status = document.getElementById("taskStatus");
+  const task = taskState.tasks.find(item => Number(item.id) === Number(taskId));
+  if (!task || !task.completed) {
+    status.textContent = "Удалять можно только выполненные задачи.";
+    return;
+  }
+  try {
+    await taskFetch(`admin_tasks?id=eq.${taskId}&completed=eq.true`, {
+      method: "DELETE",
+      headers: { "Prefer": "return=minimal" },
+    });
+    status.textContent = "Выполненная задача удалена.";
+    await tasksLoad();
+  } catch (error) {
+    status.textContent = "Не получилось удалить задачу. Проверь SQL для удаления.";
   }
 }
 
