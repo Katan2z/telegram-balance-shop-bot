@@ -1,11 +1,13 @@
 function storageFormatDate(date) {
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
+  const time = date.toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
   });
+  const dayMonth = date.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+  return `${time}, ${dayMonth}`;
 }
 
 function storageAddHours(date, hours) {
@@ -54,6 +56,13 @@ function storageParseHours(text) {
   return total > 0 ? total : null;
 }
 
+function storageTemperingHours(text) {
+  const value = storageClean(text).toLowerCase().replaceAll(",", ".");
+  if (!value || !value.includes("выдерж")) return null;
+  const match = value.match(/(\d+(?:\.\d+)?)\s*(?:час|часа|часов|ч\.?)/);
+  return match ? Number(match[1]) : 1;
+}
+
 function storageModeLabel(text, fallback) {
   return storageClean(text) || fallback || "—";
 }
@@ -71,6 +80,7 @@ function storageModesForItem(item) {
         hours: totalHours,
         defrostHours: item.defrostHours || storageParseHours(item.defrostRaw),
         storageHours: item.storageHours,
+        temperingHours: storageTemperingHours(item.prepLabel),
         label: storageModeLabel(item.prepLabel, item.prepRaw),
         place: storageModeLabel(item.prepPlace, item.storageRaw),
       });
@@ -83,6 +93,7 @@ function storageModesForItem(item) {
         title: "Перемещено в пэн / тубу",
         badge: "ТД",
         hours: movedHours,
+        temperingHours: storageTemperingHours(item.prepRaw),
         label: storageModeLabel(item.prepRaw, "ТД"),
         place: storageModeLabel(item.storageRaw, item.prepPlace),
       });
@@ -94,6 +105,7 @@ function storageModesForItem(item) {
         title: "Вскрытый сливс / упаковка",
         badge: "ТД",
         hours: openedHours,
+        temperingHours: storageTemperingHours(item.prepLabel),
         label: storageModeLabel(item.prepLabel, "ТД"),
         place: storageModeLabel(item.prepPlace, "—"),
       });
@@ -106,6 +118,7 @@ function storageModesForItem(item) {
       title: "Производство / на борту",
       badge: "ТД",
       hours: productionHours,
+      temperingHours: storageTemperingHours(item.productionLabel),
       label: storageModeLabel(item.productionLabel, "ТД"),
       place: storageModeLabel(item.productionPlace, "—"),
     });
@@ -122,6 +135,7 @@ function storageDetail(label, value) {
 function storageModeCard(item, mode, startDate) {
   const endDate = storageAddHours(startDate, mode.hours);
   const readyDate = mode.id === "defrost" && mode.defrostHours ? storageAddHours(startDate, mode.defrostHours) : null;
+  const temperingDate = mode.temperingHours ? storageAddHours(startDate, mode.temperingHours) : null;
   return `
     <div class="storage-mode-card storage-${storageSafeText(mode.id)}">
       <div class="storage-mode-head">
@@ -131,6 +145,12 @@ function storageModeCard(item, mode, startDate) {
         </div>
         <span>${storageSafeText(mode.badge)}</span>
       </div>
+      ${temperingDate ? `
+        <div class="storage-date tempering">
+          <small>Выдержка / темперирование до</small>
+          <strong>${storageFormatDate(temperingDate)}</strong>
+        </div>
+      ` : ""}
       ${readyDate ? `
         <div class="storage-date ready">
           <small>Можно использовать с</small>
@@ -142,6 +162,7 @@ function storageModeCard(item, mode, startDate) {
         <strong>${storageFormatDate(endDate)}</strong>
       </div>
       <div class="storage-details">
+        ${mode.temperingHours ? storageDetail("Выдержка", storageHoursText(mode.temperingHours)) : ""}
         ${mode.defrostHours ? storageDetail("Дефрост", `${storageHoursText(mode.defrostHours)} ${item.defrostType || ""}`) : ""}
         ${mode.storageHours ? storageDetail("После дефроста", storageHoursText(mode.storageHours)) : ""}
         ${storageDetail("Маркировка", mode.label)}
