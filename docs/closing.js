@@ -83,14 +83,6 @@ function closingBuildSection() {
               <div class="closing-progress"><i id="closingProgressBar"></i></div>
             </div>
           </div>
-
-          <div class="closing-people">
-            <label>Кто на закрытии</label>
-            <select id="closingEmployee"></select>
-            <button id="closingAssign" class="action-btn add">+ Добавить сотрудника</button>
-            <div id="closingAssignees" class="closing-assignees"></div>
-          </div>
-
           <div id="closingCategories" class="closing-categories"></div>
           <p id="closingStatus" class="admin-status"></p>
         </article>
@@ -103,7 +95,7 @@ let closingState = {
   workday: closingTodayKey(),
   users: {},
   checks: {},
-  assignees: new Set(),
+  assignees: {},
 };
 
 function closingUserOptions(users) {
@@ -113,23 +105,28 @@ function closingUserOptions(users) {
   }).join("");
 }
 
-function closingRenderAssignees() {
-  const root = document.getElementById("closingAssignees");
+function closingCategoryAssignees(category) {
+  if (!closingState.assignees[category]) closingState.assignees[category] = new Set();
+  return closingState.assignees[category];
+}
+
+function closingRenderAssignees(category) {
+  const root = document.querySelector(`[data-category-assignees="${CSS.escape(category)}"]`);
   if (!root) return;
-  const ids = [...closingState.assignees];
+  const ids = [...closingCategoryAssignees(category)];
   if (!ids.length) {
     root.innerHTML = `<p>Пока никто не выбран.</p>`;
     return;
   }
   root.innerHTML = ids.map(id => `
-    <button class="closing-person" data-remove-assignee="${closingEscape(id)}">
+    <button class="closing-person" data-remove-category="${closingEscape(category)}" data-remove-assignee="${closingEscape(id)}">
       <span>${closingEscape(initials(closingUserName(closingState.users[id])))}</span>
       <strong>${closingEscape(closingUserName(closingState.users[id]))}</strong>
       <small>×</small>
     </button>
   `).join("");
   root.querySelectorAll("[data-remove-assignee]").forEach(btn => {
-    btn.onclick = () => closingRemoveAssignee(btn.dataset.removeAssignee);
+    btn.onclick = () => closingRemoveAssignee(btn.dataset.removeCategory, btn.dataset.removeAssignee);
   });
 }
 
@@ -153,6 +150,14 @@ function closingRenderItems() {
           <h3>${closingEscape(category)}</h3>
           <span>${categoryDone}/${items.length}</span>
         </div>
+
+        <div class="closing-people closing-people-category">
+          <label>Ответственные за раздел</label>
+          <select data-category-select="${closingEscape(category)}">${closingUserOptions(closingState.users)}</select>
+          <button class="action-btn add" data-category-assign="${closingEscape(category)}">+ Добавить в ${closingEscape(category)}</button>
+          <div data-category-assignees="${closingEscape(category)}" class="closing-assignees"></div>
+        </div>
+
         <div class="closing-list">
           ${items.map(item => {
             const check = closingState.checks[item.key] || {};
@@ -177,18 +182,18 @@ function closingRenderItems() {
   root.querySelectorAll("[data-closing-key]").forEach(input => {
     input.onchange = () => closingToggleItem(input.dataset.closingKey, input.checked);
   });
+  root.querySelectorAll("[data-category-assign]").forEach(btn => {
+    btn.onclick = () => closingAddAssignee(btn.dataset.categoryAssign);
+  });
+  CLOSING_CATEGORIES.forEach(category => {
+    const select = root.querySelector(`[data-category-select="${CSS.escape(category)}"]`);
+    if (select && userId && [...select.options].some(option => option.value === userId)) select.value = userId;
+    closingRenderAssignees(category);
+  });
   if (status && !status.textContent) status.textContent = "";
 }
 
 function closingRenderAll() {
-  const select = document.getElementById("closingEmployee");
-  if (select) {
-    const previous = select.value;
-    select.innerHTML = closingUserOptions(closingState.users);
-    if (previous && [...select.options].some(option => option.value === previous)) select.value = previous;
-    else if (userId && [...select.options].some(option => option.value === userId)) select.value = userId;
-  }
-  closingRenderAssignees();
   closingRenderItems();
 }
 
@@ -207,46 +212,53 @@ async function closingLoadData() {
   await closingLoadUsers();
   const [checks, assignments] = await Promise.all([
     closingFetch(`closing_checks?workday=eq.${closingState.workday}&select=item_key,checked,checked_by,checked_at`),
-    closingFetch(`closing_assignments?workday=eq.${closingState.workday}&select=user_id,assigned_at,assigned_by`),
+    closingFetch(`closing_assignments?workday=eq.${closingState.workday}&select=category,user_id,assigned_at,assigned_by`),
   ]);
   closingState.checks = {};
   for (const row of checks || []) {
     closingState.checks[row.item_key] = row;
   }
-  closingState.assignees = new Set((assignments || []).map(row => String(row.user_id)));
+  closingState.assignees = {};
+  for (const category of CLOSING_CATEGORIES) closingState.assignees[category] = new Set();
+  for (const row of assignments || []) {
+    const category = row.category || "Общее";
+    if (!closingState.assignees[category]) closingState.assignees[category] = new Set();
+    closingState.assignees[category].add(String(row.user_id));
+  }
   closingRenderAll();
 }
 
-async function closingAddAssignee() {
-  const select = document.getElementById("closingEmployee");
+async function closingAddAssignee(category) {
+  const select = document.querySelector(`[data-category-select="${CSS.escape(category)}"]`);
   const status = document.getElementById("closingStatus");
   const selected = select?.value;
   if (!selected) return;
   try {
-    await closingFetch("closing_assignments?on_conflict=workday,user_id", {
+    await closingFetch("closing_assignments?on_conflict=workday,category,user_id", {
       method: "POST",
       headers: { "Prefer": "resolution=merge-duplicates" },
       body: JSON.stringify({
         workday: closingState.workday,
+        category,
         user_id: Number(selected),
         assigned_by: userId ? Number(userId) : null,
       }),
     });
-    closingState.assignees.add(String(selected));
-    closingRenderAssignees();
-    status.textContent = `Добавлен: ${closingUserName(closingState.users[selected])}`;
+    closingCategoryAssignees(category).add(String(selected));
+    closingRenderAssignees(category);
+    status.textContent = `${category}: добавлен ${closingUserName(closingState.users[selected])}`;
   } catch (error) {
-    status.textContent = "Не получилось добавить сотрудника. Проверь SQL для закрытия.";
+    status.textContent = "Не получилось добавить сотрудника. Запусти обновлённый SQL для закрытия.";
   }
 }
 
-async function closingRemoveAssignee(id) {
+async function closingRemoveAssignee(category, id) {
   const status = document.getElementById("closingStatus");
   try {
-    await closingFetch(`closing_assignments?workday=eq.${closingState.workday}&user_id=eq.${id}`, { method: "DELETE" });
-    closingState.assignees.delete(String(id));
-    closingRenderAssignees();
-    status.textContent = `Убран: ${closingUserName(closingState.users[id])}`;
+    await closingFetch(`closing_assignments?workday=eq.${closingState.workday}&category=eq.${encodeURIComponent(category)}&user_id=eq.${id}`, { method: "DELETE" });
+    closingCategoryAssignees(category).delete(String(id));
+    closingRenderAssignees(category);
+    status.textContent = `${category}: убран ${closingUserName(closingState.users[id])}`;
   } catch (error) {
     status.textContent = "Не получилось убрать сотрудника.";
   }
@@ -280,8 +292,6 @@ async function closingToggleItem(key, checked) {
 
 function closingInit() {
   closingBuildSection();
-  const btn = document.getElementById("closingAssign");
-  if (btn) btn.onclick = closingAddAssignee;
   closingLoadData().catch(() => {
     const status = document.getElementById("closingStatus");
     if (status) status.textContent = "Раздел готов, но нужны таблицы Supabase для сохранения.";
