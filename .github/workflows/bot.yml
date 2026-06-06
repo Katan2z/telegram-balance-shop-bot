@@ -43,12 +43,6 @@ jobs:
           git diff --cached --quiet || git commit -m "Update mini app config"
           git push || true
 
-      - name: Migrate users to Supabase
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: python migrate_to_supabase.py
-
       - name: Run bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
