@@ -59,8 +59,14 @@ function storageParseHours(text) {
 function storageTemperingHours(text) {
   const value = storageClean(text).toLowerCase().replaceAll(",", ".");
   if (!value || !value.includes("выдерж")) return null;
-  const match = value.match(/(\d+(?:\.\d+)?)\s*(?:час|часа|часов|ч\.?)/);
-  return match ? Number(match[1]) : 1;
+
+  const beforeHold = value.match(/(\d+(?:\.\d+)?)\s*(?:час|часа|часов|ч\.?)\s*(?:время\s*)?выдерж/);
+  if (beforeHold) return Number(beforeHold[1]);
+
+  const includingHold = value.match(/(?:включая|вкл\.?)[^\d]*(\d+(?:\.\d+)?)\s*(?:час|часа|часов|ч\.?)/);
+  if (includingHold) return Number(includingHold[1]);
+
+  return 1;
 }
 
 function storageModeLabel(text, fallback) {
@@ -145,8 +151,6 @@ function storageModeCard(item, mode, startDate) {
   const endDate = storageAddHours(startDate, mode.hours);
   const readyDate = mode.id === "defrost" && mode.defrostHours ? storageAddHours(startDate, mode.defrostHours) : null;
   const temperingDate = mode.temperingHours ? storageAddHours(startDate, mode.temperingHours) : null;
-  const usefulLabel = temperingDate ? "Можно использовать с" : "Годно до";
-  const usefulDate = temperingDate || endDate;
 
   return `
     <div class="storage-mode-card storage-${storageSafeText(mode.id)}">
