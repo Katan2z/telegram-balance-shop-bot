@@ -35,6 +35,91 @@ function storageSafeText(value) {
     .replaceAll("'", "&#039;");
 }
 
+function storageClean(value) {
+  const text = String(value ?? "").trim();
+  if (!text || text === "-" || text === " - ") return "";
+  return text;
+}
+
+function storageParseHours(text) {
+  const value = storageClean(text).toLowerCase().replaceAll(",", ".");
+  if (!value || value.includes("согласно")) return null;
+
+  let total = 0;
+  const dayMatch = value.match(/(\d+(?:\.\d+)?)\s*(?:день|дня|дней|сутки|суток|сут)/);
+  const hourMatch = value.match(/(\d+(?:\.\d+)?)\s*(?:час|часа|часов|ч\.?)/);
+  const minuteMatch = value.match(/(\d+(?:\.\d+)?)\s*(?:мин|минут|минуты)/);
+
+  if (dayMatch) total += Number(dayMatch[1]) * 24;
+  if (hourMatch) total += Number(hourMatch[1]);
+  if (minuteMatch) total += Number(minuteMatch[1]) / 60;
+
+  return total > 0 ? total : null;
+}
+
+function storageModeLabel(text, fallback) {
+  return storageClean(text) || fallback || "—";
+}
+
+function storageModesForItem(item) {
+  const modes = [];
+  const hasDefrost = Boolean(item.defrostHours || item.defrostRaw || item.defrostType);
+
+  if (hasDefrost) {
+    const totalHours = item.prepHours || ((item.defrostHours || 0) + (item.storageHours || 0));
+    if (totalHours) {
+      modes.push({
+        id: "defrost",
+        title: "Дефрост / подготовка",
+        short: "П/Т/Д",
+        hours: totalHours,
+        defrostHours: item.defrostHours || storageParseHours(item.defrostRaw),
+        storageHours: item.storageHours,
+        label: storageModeLabel(item.prepLabel, item.prepRaw),
+        place: storageModeLabel(item.prepPlace, item.storageRaw),
+      });
+    }
+  } else {
+    const movedHours = storageParseHours(item.prepRaw) || item.prepHours;
+    if (movedHours) {
+      modes.push({
+        id: "moved",
+        title: "Перемещено в пэн / тубу",
+        short: "ТД",
+        hours: movedHours,
+        label: storageModeLabel(item.prepRaw, "ТД"),
+        place: storageModeLabel(item.storageRaw, item.prepPlace),
+      });
+    }
+
+    const openedHours = storageParseHours(item.prepLabel);
+    if (openedHours) {
+      modes.push({
+        id: "opened",
+        title: "Вскрытый сливс / упаковка",
+        short: "ТД",
+        hours: openedHours,
+        label: storageModeLabel(item.prepLabel, "ТД"),
+        place: storageModeLabel(item.prepPlace, "—"),
+      });
+    }
+  }
+
+  const productionHours = storageParseHours(item.productionLabel) || item.productionHours;
+  if (productionHours) {
+    modes.push({
+      id: "production",
+      title: "Производство / на борту",
+      short: "ТД",
+      hours: productionHours,
+      label: storageModeLabel(item.productionLabel, "ТД"),
+      place: storageModeLabel(item.productionPlace, "—"),
+    });
+  }
+
+  return modes;
+}
+
 function storageBuildCalculator() {
   const tabs = document.getElementById("tabs");
   const app = document.querySelector("main.app");
@@ -57,10 +142,7 @@ function storageBuildCalculator() {
             <label>Продукт</label>
             <select id="storageProduct"></select>
             <label>Режим</label>
-            <select id="storageMode">
-              <option value="prep">Подготовка / дефрост / вскрытие</option>
-              <option value="production">Производство / на борту</option>
-            </select>
+            <select id="storageMode"></select>
             <label>Дата и время старта</label>
             <input id="storageStart" type="datetime-local" />
             <button id="storageCalculate" class="action-btn add">Рассчитать</button>
@@ -91,8 +173,21 @@ function storageBuildCalculator() {
   function renderProducts(keepValue = true) {
     const previous = keepValue ? product.value : "";
     const rows = filteredItems();
-    product.innerHTML = rows.map((item, index) => `<option value="${items.indexOf(item)}">${storageSafeText(item.name)}</option>`).join("");
+    product.innerHTML = rows.map(item => `<option value="${items.indexOf(item)}">${storageSafeText(item.name)}</option>`).join("");
     if (previous && [...product.options].some(option => option.value === previous)) product.value = previous;
+    renderModes();
+  }
+
+  function renderModes(keepValue = true) {
+    const item = items[Number(product.value)];
+    const previous = keepValue ? mode.value : "";
+    const modes = item ? storageModesForItem(item) : [];
+    mode.innerHTML = modes.map(m => `<option value="${storageSafeText(m.id)}">${storageSafeText(m.title)}</option>`).join("");
+    if (previous && [...mode.options].some(option => option.value === previous)) mode.value = previous;
+  }
+
+  function selectedMode(item) {
+    return storageModesForItem(item).find(m => m.id === mode.value);
   }
 
   function calculateResult() {
@@ -103,69 +198,73 @@ function storageBuildCalculator() {
       return;
     }
 
-    if (mode.value === "production") {
-      if (!item.productionHours) {
-        result.innerHTML = `<p>Для этого продукта нет срока в блоке производства.</p>`;
-        return;
-      }
-      const endDate = storageAddHours(startDate, item.productionHours);
+    renderModes(true);
+    const currentMode = selectedMode(item);
+    if (!currentMode) {
+      result.innerHTML = `<p>Для этого продукта нет доступного срока в таблице.</p>`;
+      return;
+    }
+
+    if (currentMode.id === "defrost") {
+      const readyDate = currentMode.defrostHours ? storageAddHours(startDate, currentMode.defrostHours) : null;
+      const endDate = storageAddHours(startDate, currentMode.hours);
       result.innerHTML = `
         <div class="rank">
-          <div class="rank-medal">ТД</div>
+          <div class="rank-medal">П</div>
           <div>
             <strong>${storageSafeText(item.name)}</strong>
-            <span>Годно до: ${storageFormatDate(endDate)}</span>
+            <span>Старт: ${storageFormatDate(startDate)}</span>
           </div>
         </div>
-        <p><b>Срок:</b> ${storageHoursText(item.productionHours)}</p>
-        <p><b>Маркировка:</b> ${storageSafeText(item.productionLabel || "—")}</p>
-        <p><b>Место:</b> ${storageSafeText(item.productionPlace || "—")}</p>
+        ${readyDate ? `
+        <div class="rank">
+          <div class="rank-medal">Т</div>
+          <div>
+            <strong>Готово к использованию</strong>
+            <span>${storageFormatDate(readyDate)}</span>
+          </div>
+        </div>` : ""}
+        <div class="rank">
+          <div class="rank-medal">Д</div>
+          <div>
+            <strong>Окончание срока</strong>
+            <span>${storageFormatDate(endDate)}</span>
+          </div>
+        </div>
+        <p><b>Общий срок:</b> ${storageHoursText(currentMode.hours)}</p>
+        ${currentMode.defrostHours ? `<p><b>Дефрост:</b> ${storageHoursText(currentMode.defrostHours)} ${storageSafeText(item.defrostType || "")}</p>` : ""}
+        ${currentMode.storageHours ? `<p><b>Хранение после дефроста:</b> ${storageHoursText(currentMode.storageHours)}</p>` : ""}
+        <p><b>Маркировка:</b> ${storageSafeText(currentMode.label)}</p>
+        <p><b>Место:</b> ${storageSafeText(currentMode.place)}</p>
       `;
       return;
     }
 
-    const totalHours = item.prepHours || ((item.defrostHours || 0) + (item.storageHours || 0));
-    if (!totalHours) {
-      result.innerHTML = `<p>Для этого продукта нет срока в блоке подготовки.</p>`;
-      return;
-    }
-
-    const readyDate = item.defrostHours ? storageAddHours(startDate, item.defrostHours) : null;
-    const endDate = storageAddHours(startDate, totalHours);
+    const endDate = storageAddHours(startDate, currentMode.hours);
     result.innerHTML = `
       <div class="rank">
-        <div class="rank-medal">П</div>
+        <div class="rank-medal">${storageSafeText(currentMode.short)}</div>
         <div>
           <strong>${storageSafeText(item.name)}</strong>
-          <span>Старт: ${storageFormatDate(startDate)}</span>
+          <span>Годно до: ${storageFormatDate(endDate)}</span>
         </div>
       </div>
-      ${readyDate ? `
-      <div class="rank">
-        <div class="rank-medal">Т</div>
-        <div>
-          <strong>Готово к использованию</strong>
-          <span>${storageFormatDate(readyDate)}</span>
-        </div>
-      </div>` : ""}
-      <div class="rank">
-        <div class="rank-medal">Д</div>
-        <div>
-          <strong>Окончание срока</strong>
-          <span>${storageFormatDate(endDate)}</span>
-        </div>
-      </div>
-      <p><b>Общий срок:</b> ${storageHoursText(totalHours)}</p>
-      ${item.defrostHours ? `<p><b>Дефрост:</b> ${storageHoursText(item.defrostHours)} ${storageSafeText(item.defrostType || "")}</p>` : ""}
-      ${item.storageHours ? `<p><b>Хранение после дефроста:</b> ${storageHoursText(item.storageHours)}</p>` : ""}
-      <p><b>Маркировка:</b> ${storageSafeText(item.prepLabel || item.prepRaw || "—")}</p>
-      <p><b>Место:</b> ${storageSafeText(item.prepPlace || item.storageRaw || "—")}</p>
+      <p><b>Режим:</b> ${storageSafeText(currentMode.title)}</p>
+      <p><b>Срок:</b> ${storageHoursText(currentMode.hours)}</p>
+      <p><b>Маркировка:</b> ${storageSafeText(currentMode.label)}</p>
+      <p><b>Место:</b> ${storageSafeText(currentMode.place)}</p>
     `;
   }
 
-  search.addEventListener("input", () => renderProducts(false));
+  search.addEventListener("input", () => {
+    renderProducts(false);
+    calculateResult();
+  });
   calculate.addEventListener("click", calculateResult);
-  product.addEventListener("change", calculateResult);
+  product.addEventListener("change", () => {
+    renderModes(false);
+    calculateResult();
+  });
   mode.addEventListener("change", calculateResult);
   start.addEventListener("change", calculateResult);
 
