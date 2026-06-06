@@ -112,6 +112,7 @@ let closingState = {
   checks: {},
   assignees: {},
   historyOpen: false,
+  historySelectedDay: null,
 };
 
 function closingUserOptions(users) {
@@ -260,20 +261,46 @@ async function closingLoadHistory() {
     const historyRows = await closingFetch("closing_checks?select=workday&order=workday.desc&limit=300");
     let workdays = closingUniqueWorkdays(historyRows);
     if (!workdays.includes(closingState.workday)) workdays.unshift(closingState.workday);
-    workdays = workdays.slice(0, 7);
+    workdays = [...new Set(workdays)].slice(0, 14);
+    const selected = closingState.historySelectedDay && workdays.includes(closingState.historySelectedDay)
+      ? closingState.historySelectedDay
+      : workdays[0];
+    closingState.historySelectedDay = selected;
 
-    const cards = [];
-    for (const day of workdays) {
-      const [checks, assignments] = await Promise.all([
-        closingFetch(`closing_checks?workday=eq.${day}&select=item_key,checked,checked_by,checked_at`),
-        closingFetch(`closing_assignments?workday=eq.${day}&select=category,user_id,assigned_at,assigned_by`),
-      ]);
-      cards.push(closingHistoryCard(day, checks || [], assignments || []));
+    content.innerHTML = `
+      <div class="closing-history-picker">
+        <label>Выбери дату закрытия</label>
+        <select id="closingHistorySelect">
+          ${workdays.map(day => `<option value="${closingEscape(day)}" ${day === selected ? "selected" : ""}>${closingEscape(closingDisplayDate(day))}</option>`).join("")}
+        </select>
+      </div>
+      <div id="closingHistoryDetail" class="closing-history-detail">
+        <p>Загрузка закрытия...</p>
+      </div>
+    `;
+
+    const select = document.getElementById("closingHistorySelect");
+    if (select) {
+      select.onchange = () => {
+        closingState.historySelectedDay = select.value;
+        closingLoadHistoryDay(select.value).catch(() => {});
+      };
     }
-    content.innerHTML = cards.join("") || `<p>История пока пустая.</p>`;
+    await closingLoadHistoryDay(selected);
   } catch (error) {
     content.innerHTML = `<p>Не получилось загрузить историю. Проверь таблицы Supabase.</p>`;
   }
+}
+
+async function closingLoadHistoryDay(day) {
+  const detail = document.getElementById("closingHistoryDetail");
+  if (!detail || !day) return;
+  detail.innerHTML = `<p>Загрузка закрытия...</p>`;
+  const [checks, assignments] = await Promise.all([
+    closingFetch(`closing_checks?workday=eq.${day}&select=item_key,checked,checked_by,checked_at`),
+    closingFetch(`closing_assignments?workday=eq.${day}&select=category,user_id,assigned_at,assigned_by`),
+  ]);
+  detail.innerHTML = closingHistoryCard(day, checks || [], assignments || []);
 }
 
 function closingHistoryCard(day, checks, assignments) {
@@ -308,7 +335,6 @@ function closingHistoryCard(day, checks, assignments) {
 
   const doneItems = window.CLOSING_ITEMS
     .filter(item => checkMap[item.key]?.checked)
-    .slice(0, 6)
     .map(item => {
       const row = checkMap[item.key];
       const who = row.checked_by ? closingUserName(closingState.users[String(row.checked_by)]) : "Сотрудник";
@@ -317,7 +343,7 @@ function closingHistoryCard(day, checks, assignments) {
     }).join("");
 
   return `
-    <section class="closing-history-card">
+    <section class="closing-history-card closing-history-modal">
       <div class="closing-history-card-head">
         <div>
           <small>Закрытие</small>
@@ -394,7 +420,7 @@ async function closingToggleItem(key, checked) {
       body: JSON.stringify(payload),
     });
     status.textContent = checked ? `Отмечено в ${closingNowText()}` : `Снята отметка в ${closingNowText()}`;
-    if (closingState.historyOpen) closingLoadHistory().catch(() => {});
+    if (closingState.historyOpen && closingState.historySelectedDay) closingLoadHistoryDay(closingState.historySelectedDay).catch(() => {});
   } catch (error) {
     status.textContent = "Не получилось сохранить галочку. Проверь SQL для закрытия.";
     await closingLoadData().catch(() => {});
@@ -417,7 +443,7 @@ function closingInit() {
   }, 60000);
   setInterval(() => {
     closingLoadData().catch(() => {});
-    if (closingState.historyOpen) closingLoadHistory().catch(() => {});
+    if (closingState.historyOpen && closingState.historySelectedDay) closingLoadHistoryDay(closingState.historySelectedDay).catch(() => {});
   }, 10000);
 }
 
