@@ -171,10 +171,13 @@ function taskCard(task) {
           <small>${completed ? "Выполнено" : overdue ? "Просрочено" : "Активно"}</small>
           <strong>${taskEscape(task.title)}</strong>
         </div>
-        <label class="task-check">
-          <input type="checkbox" data-task-toggle="${task.id}" ${completed ? "checked" : ""} />
-          <span></span>
-        </label>
+        <div class="task-card-actions">
+          ${completed ? `<button class="task-delete-icon" data-task-delete="${task.id}" title="Удалить">🗑️</button>` : ""}
+          <label class="task-check">
+            <input type="checkbox" data-task-toggle="${task.id}" ${completed ? "checked" : ""} />
+            <span></span>
+          </label>
+        </div>
       </div>
       ${task.description ? `<p>${taskEscape(task.description)}</p>` : ""}
       <div class="task-meta-grid">
