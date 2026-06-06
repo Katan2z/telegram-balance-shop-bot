@@ -70,7 +70,10 @@ function closingBuildSection() {
     app.insertAdjacentHTML("beforeend", `
       <section class="tab-page" id="tab-closing">
         <article class="card closing-panel">
-          <h2>✅ Закрытие смены</h2>
+          <div class="closing-title-row">
+            <h2>✅ Закрытие смены</h2>
+            <button id="closingHistoryButton" class="closing-history-button">📜 История</button>
+          </div>
           <div class="closing-top">
             <div class="closing-date-card">
               <small>Рабочий день</small>
@@ -81,6 +84,18 @@ function closingBuildSection() {
               <small>Прогресс</small>
               <strong id="closingProgress">0/0</strong>
               <div class="closing-progress"><i id="closingProgressBar"></i></div>
+            </div>
+          </div>
+          <div id="closingHistoryPanel" class="closing-history-panel hidden">
+            <div class="closing-history-head">
+              <div>
+                <small>Архив закрытий</small>
+                <strong>История</strong>
+              </div>
+              <button id="closingHistoryClose" class="closing-history-close">×</button>
+            </div>
+            <div id="closingHistoryContent" class="closing-history-content">
+              <p>Загрузка истории...</p>
             </div>
           </div>
           <div id="closingCategories" class="closing-categories"></div>
@@ -96,6 +111,7 @@ let closingState = {
   users: {},
   checks: {},
   assignees: {},
+  historyOpen: false,
 };
 
 function closingUserOptions(users) {
@@ -228,6 +244,100 @@ async function closingLoadData() {
   closingRenderAll();
 }
 
+function closingUniqueWorkdays(rows) {
+  return [...new Set((rows || []).map(row => row.workday).filter(Boolean))].slice(0, 10);
+}
+
+async function closingLoadHistory() {
+  const panel = document.getElementById("closingHistoryPanel");
+  const content = document.getElementById("closingHistoryContent");
+  if (!panel || !content) return;
+  panel.classList.remove("hidden");
+  closingState.historyOpen = true;
+  content.innerHTML = `<p>Загрузка истории...</p>`;
+
+  try {
+    const historyRows = await closingFetch("closing_checks?select=workday&order=workday.desc&limit=300");
+    let workdays = closingUniqueWorkdays(historyRows);
+    if (!workdays.includes(closingState.workday)) workdays.unshift(closingState.workday);
+    workdays = workdays.slice(0, 7);
+
+    const cards = [];
+    for (const day of workdays) {
+      const [checks, assignments] = await Promise.all([
+        closingFetch(`closing_checks?workday=eq.${day}&select=item_key,checked,checked_by,checked_at`),
+        closingFetch(`closing_assignments?workday=eq.${day}&select=category,user_id,assigned_at,assigned_by`),
+      ]);
+      cards.push(closingHistoryCard(day, checks || [], assignments || []));
+    }
+    content.innerHTML = cards.join("") || `<p>История пока пустая.</p>`;
+  } catch (error) {
+    content.innerHTML = `<p>Не получилось загрузить историю. Проверь таблицы Supabase.</p>`;
+  }
+}
+
+function closingHistoryCard(day, checks, assignments) {
+  const checkMap = {};
+  for (const row of checks) checkMap[row.item_key] = row;
+  const total = window.CLOSING_ITEMS.length;
+  const done = window.CLOSING_ITEMS.filter(item => checkMap[item.key]?.checked).length;
+  const percent = total ? Math.round(done / total * 100) : 0;
+
+  const assignedByCategory = {};
+  for (const category of CLOSING_CATEGORIES) assignedByCategory[category] = [];
+  for (const row of assignments) {
+    const category = row.category || "Общее";
+    if (!assignedByCategory[category]) assignedByCategory[category] = [];
+    assignedByCategory[category].push(String(row.user_id));
+  }
+
+  const categoryHtml = CLOSING_CATEGORIES.map(category => {
+    const items = window.CLOSING_ITEMS.filter(item => item.category === category);
+    const categoryDone = items.filter(item => checkMap[item.key]?.checked).length;
+    const names = (assignedByCategory[category] || []).map(id => closingUserName(closingState.users[id])).join(", ") || "не назначены";
+    return `
+      <div class="closing-history-category">
+        <div>
+          <strong>${closingEscape(category)}</strong>
+          <span>${closingEscape(names)}</span>
+        </div>
+        <em>${categoryDone}/${items.length}</em>
+      </div>
+    `;
+  }).join("");
+
+  const doneItems = window.CLOSING_ITEMS
+    .filter(item => checkMap[item.key]?.checked)
+    .slice(0, 6)
+    .map(item => {
+      const row = checkMap[item.key];
+      const who = row.checked_by ? closingUserName(closingState.users[String(row.checked_by)]) : "Сотрудник";
+      const at = row.checked_at ? new Date(row.checked_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "";
+      return `<li>${closingEscape(item.title)} <span>${closingEscape(who)} ${closingEscape(at)}</span></li>`;
+    }).join("");
+
+  return `
+    <section class="closing-history-card">
+      <div class="closing-history-card-head">
+        <div>
+          <small>Закрытие</small>
+          <strong>${closingEscape(closingDisplayDate(day))}</strong>
+        </div>
+        <span>${done}/${total}</span>
+      </div>
+      <div class="closing-progress history"><i style="width:${percent}%"></i></div>
+      <div class="closing-history-categories">${categoryHtml}</div>
+      ${doneItems ? `<ul class="closing-history-list">${doneItems}</ul>` : `<p>Выполненных пунктов пока нет.</p>`}
+    </section>
+  `;
+}
+
+function closingCloseHistory() {
+  const panel = document.getElementById("closingHistoryPanel");
+  if (panel) panel.classList.add("hidden");
+  closingState.historyOpen = false;
+}
+
 async function closingAddAssignee(category) {
   const select = document.querySelector(`[data-category-select="${CSS.escape(category)}"]`);
   const status = document.getElementById("closingStatus");
@@ -284,6 +394,7 @@ async function closingToggleItem(key, checked) {
       body: JSON.stringify(payload),
     });
     status.textContent = checked ? `Отмечено в ${closingNowText()}` : `Снята отметка в ${closingNowText()}`;
+    if (closingState.historyOpen) closingLoadHistory().catch(() => {});
   } catch (error) {
     status.textContent = "Не получилось сохранить галочку. Проверь SQL для закрытия.";
     await closingLoadData().catch(() => {});
@@ -292,6 +403,10 @@ async function closingToggleItem(key, checked) {
 
 function closingInit() {
   closingBuildSection();
+  const historyButton = document.getElementById("closingHistoryButton");
+  const historyClose = document.getElementById("closingHistoryClose");
+  if (historyButton) historyButton.onclick = closingLoadHistory;
+  if (historyClose) historyClose.onclick = closingCloseHistory;
   closingLoadData().catch(() => {
     const status = document.getElementById("closingStatus");
     if (status) status.textContent = "Раздел готов, но нужны таблицы Supabase для сохранения.";
@@ -300,7 +415,10 @@ function closingInit() {
     const newKey = closingTodayKey();
     if (newKey !== closingState.workday) closingLoadData().catch(() => {});
   }, 60000);
-  setInterval(() => closingLoadData().catch(() => {}), 10000);
+  setInterval(() => {
+    closingLoadData().catch(() => {});
+    if (closingState.historyOpen) closingLoadHistory().catch(() => {});
+  }, 10000);
 }
 
 closingInit();
