@@ -132,10 +132,22 @@ function storageDetail(label, value) {
   return `<div class="storage-detail"><span>${storageSafeText(label)}</span><strong>${storageSafeText(cleanValue)}</strong></div>`;
 }
 
+function storageDateRow(label, value, kind = "") {
+  return `
+    <div class="storage-date ${kind}" style="padding:10px 12px;">
+      <small>${storageSafeText(label)}</small>
+      <strong style="font-size:clamp(17px, 2.2vw, 23px); line-height:1.05; white-space:nowrap;">${storageSafeText(value)}</strong>
+    </div>
+  `;
+}
+
 function storageModeCard(item, mode, startDate) {
   const endDate = storageAddHours(startDate, mode.hours);
   const readyDate = mode.id === "defrost" && mode.defrostHours ? storageAddHours(startDate, mode.defrostHours) : null;
   const temperingDate = mode.temperingHours ? storageAddHours(startDate, mode.temperingHours) : null;
+  const usefulLabel = temperingDate ? "Можно использовать с" : "Годно до";
+  const usefulDate = temperingDate || endDate;
+
   return `
     <div class="storage-mode-card storage-${storageSafeText(mode.id)}">
       <div class="storage-mode-head">
@@ -145,22 +157,12 @@ function storageModeCard(item, mode, startDate) {
         </div>
         <span>${storageSafeText(mode.badge)}</span>
       </div>
-      ${temperingDate ? `
-        <div class="storage-date tempering">
-          <small>Выдержка / темперирование до</small>
-          <strong>${storageFormatDate(temperingDate)}</strong>
-        </div>
-      ` : ""}
-      ${readyDate ? `
-        <div class="storage-date ready">
-          <small>Можно использовать с</small>
-          <strong>${storageFormatDate(readyDate)}</strong>
-        </div>
-      ` : ""}
-      <div class="storage-date expire">
-        <small>Годно до</small>
-        <strong>${storageFormatDate(endDate)}</strong>
-      </div>
+
+      ${storageDateRow("Старт", storageFormatDate(startDate), "start")}
+      ${temperingDate ? storageDateRow("Темперирование до", storageFormatDate(temperingDate), "ready") : ""}
+      ${readyDate ? storageDateRow("Можно использовать с", storageFormatDate(readyDate), "ready") : ""}
+      ${storageDateRow("Годно до", storageFormatDate(endDate), "expire")}
+
       <div class="storage-details">
         ${mode.temperingHours ? storageDetail("Выдержка", storageHoursText(mode.temperingHours)) : ""}
         ${mode.defrostHours ? storageDetail("Дефрост", `${storageHoursText(mode.defrostHours)} ${item.defrostType || ""}`) : ""}
