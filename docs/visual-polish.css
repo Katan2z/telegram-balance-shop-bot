@@ -1,0 +1,247 @@
+/* Soft visual polish layer. Safe CSS-only upgrade. */
+:root {
+  --soft-glass: rgba(255, 253, 247, .78);
+  --soft-border: rgba(90, 43, 29, .11);
+  --soft-shadow: 0 18px 38px rgba(50, 22, 14, .11);
+  --soft-shadow-small: 0 10px 22px rgba(50, 22, 14, .09);
+}
+
+body {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(255, 210, 90, .55) 0 92px, transparent 95px),
+    radial-gradient(circle at 94% 16%, rgba(216, 39, 22, .12) 0 115px, transparent 118px),
+    radial-gradient(circle at 88% 88%, rgba(122, 62, 40, .14) 0 135px, transparent 138px),
+    linear-gradient(145deg, #fff9ed 0%, #fff0d0 46%, #f2d3a4 100%);
+}
+
+.app {
+  padding-top: 14px;
+}
+
+.hero,
+.card,
+.tabs,
+.closing-category,
+.task-card,
+.storage-mode-card,
+.closing-history-panel,
+.tasks-form,
+.closing-people {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.hero {
+  border-radius: 32px;
+  box-shadow: 0 22px 48px rgba(50, 22, 14, .13), inset 0 0 0 1px rgba(255, 255, 255, .74);
+}
+
+.balance-card {
+  transform: translateZ(0);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.balance-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 38px rgba(50, 22, 14, .28), inset 0 0 0 2px rgba(255, 210, 90, .24);
+}
+
+.tabs {
+  padding: 7px;
+  gap: 7px;
+  border-radius: 26px;
+  box-shadow: 0 14px 30px rgba(50, 22, 14, .11);
+}
+
+.tab {
+  position: relative;
+  overflow: hidden;
+  min-height: 48px;
+  transition: transform .16s ease, background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+
+.tab:not(.active):hover {
+  background: rgba(90, 43, 29, .055);
+  transform: translateY(-1px);
+}
+
+.tab.active {
+  box-shadow: 0 10px 22px rgba(50, 22, 14, .22);
+}
+
+.card {
+  border-radius: 32px;
+  background: rgba(255, 253, 247, .88);
+  box-shadow: var(--soft-shadow), inset 0 0 0 1px rgba(255, 255, 255, .76);
+}
+
+.card h2 {
+  letter-spacing: -.4px;
+}
+
+.rank,
+.stat-tile,
+.hero-person,
+.storage-date,
+.closing-item,
+.task-meta-grid div,
+.closing-history-card,
+.closing-history-category {
+  box-shadow: 0 8px 18px rgba(50, 22, 14, .065);
+}
+
+.admin-form select,
+.admin-form input,
+.tasks-form input,
+.tasks-form select,
+.tasks-form textarea,
+.closing-people select {
+  outline: none;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.admin-form select:focus,
+.admin-form input:focus,
+.tasks-form input:focus,
+.tasks-form select:focus,
+.tasks-form textarea:focus,
+.closing-people select:focus {
+  border-color: rgba(216, 39, 22, .42);
+  box-shadow: 0 0 0 4px rgba(216, 39, 22, .08);
+}
+
+button,
+.action-btn,
+.tasks-refresh,
+.closing-history-button,
+.task-delete,
+.task-delete-icon,
+.closing-person {
+  transition: transform .14s ease, box-shadow .14s ease, opacity .14s ease, filter .14s ease;
+}
+
+button:active,
+.action-btn:active,
+.tasks-refresh:active,
+.closing-history-button:active,
+.task-delete:active,
+.task-delete-icon:active,
+.closing-person:active {
+  transform: scale(.985);
+}
+
+.action-btn:hover,
+.tasks-refresh:hover,
+.closing-history-button:hover,
+.task-delete:hover,
+.task-delete-icon:hover {
+  filter: brightness(1.03);
+}
+
+.action-btn.add {
+  background: linear-gradient(135deg, #2e8a55, #36a465);
+}
+
+.action-btn.remove,
+.task-delete,
+.task-delete-icon {
+  background: linear-gradient(135deg, #d82716, #f0442e);
+}
+
+.storage-summary,
+.closing-date-card,
+.closing-progress-card,
+.tasks-form {
+  box-shadow: 0 16px 32px rgba(50, 22, 14, .105);
+}
+
+.storage-mode-card,
+.closing-category,
+.task-card {
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.storage-mode-card:hover,
+.closing-category:hover,
+.task-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(50, 22, 14, .12);
+}
+
+.closing-item {
+  transition: transform .14s ease, background .14s ease, border-color .14s ease;
+}
+
+.closing-item:hover {
+  transform: translateX(1px);
+  background: rgba(255, 255, 255, .86);
+}
+
+.closing-item.checked {
+  border-color: rgba(46, 138, 85, .24);
+  background: rgba(255, 255, 255, .58);
+}
+
+.task-card.done .task-card-head strong,
+.closing-item.checked .closing-text strong {
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(46, 138, 85, .42);
+}
+
+.task-delete-icon {
+  display: grid;
+  place-items: center;
+}
+
+.closing-progress i,
+.progress i {
+  background: linear-gradient(90deg, #2e8a55, #ffd25a, #f18b22);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(90, 43, 29, .06);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(90, 43, 29, .22);
+  border-radius: 999px;
+  border: 2px solid rgba(255, 250, 240, .8);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 43, 29, .34);
+}
+
+@media (max-width: 760px) {
+  .hero {
+    border-radius: 28px;
+  }
+
+  .hero h1 {
+    font-size: clamp(42px, 13vw, 56px);
+  }
+
+  .card {
+    border-radius: 28px;
+  }
+
+  .tabs {
+    top: 6px;
+    border-radius: 22px;
+  }
+
+  .tab {
+    min-height: 46px;
+    font-size: 12px;
+  }
+
+  .closing-title-row,
+  .tasks-title-row {
+    gap: 10px;
+  }
+}
