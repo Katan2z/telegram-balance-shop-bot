@@ -58,9 +58,9 @@ function tasksBuildSection() {
 
           <div class="tasks-form">
             <label>Название задачи</label>
-            <input id="taskTitle" type="text" placeholder="Например: проверить таймеры" />
+            <input id="taskTitle" type="text" />
             <label>Описание</label>
-            <textarea id="taskDescription" placeholder="Что именно нужно сделать"></textarea>
+            <textarea id="taskDescription"></textarea>
             <div class="tasks-form-grid">
               <div>
                 <label>Ответственный</label>
