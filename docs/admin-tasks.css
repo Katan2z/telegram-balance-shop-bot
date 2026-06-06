@@ -108,6 +108,19 @@
   letter-spacing: .7px;
 }
 .task-meta-grid strong { display: block; margin-top: 4px; color: var(--choco-2); font-weight: 900; }
+.task-delete {
+  width: 100%;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--red);
+  color: #fff;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(216, 39, 22, .18);
+}
 @media (max-width: 820px) {
   .tasks-title-row { display: grid; }
   .tasks-refresh { width: 100%; }
