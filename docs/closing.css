@@ -1,4 +1,17 @@
 .closing-panel { overflow: visible; }
+.closing-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.closing-title-row h2 { margin-bottom: 0; }
+.closing-history-button {
+  border: 0;
+  border-radius: 18px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, var(--choco), var(--choco-2));
+  color: var(--cream);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(50, 22, 14, .18);
+}
 .closing-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
 .closing-date-card, .closing-progress-card {
   padding: 16px;
@@ -26,6 +39,7 @@
 .closing-date-card span { display: block; margin-top: 8px; color: var(--choco-2); font-weight: 900; }
 .closing-progress { height: 12px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: rgba(90, 43, 29, .14); }
 .closing-progress i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--green), var(--yellow)); transition: width .2s ease; }
+.closing-progress.history { margin: 12px 0; }
 .closing-people {
   position: relative;
   display: grid;
@@ -128,7 +142,58 @@
 .closing-text strong { display: block; color: var(--choco); font-weight: 900; line-height: 1.25; }
 .closing-text small { display: block; margin-top: 6px; color: rgba(50, 22, 14, .58); font-weight: 900; }
 .closing-item.checked .closing-text strong { color: rgba(50, 22, 14, .58); text-decoration: line-through; }
+.closing-history-panel {
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #fffaf0, #ffe4ad);
+  border: 1px solid rgba(90, 43, 29, .14);
+  box-shadow: 0 18px 34px rgba(50, 22, 14, .13);
+}
+.closing-history-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.closing-history-head small { display: block; color: rgba(50, 22, 14, .62); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .8px; }
+.closing-history-head strong { display: block; font-family: 'Russo One', Inter, sans-serif; font-size: 30px; color: var(--choco-2); }
+.closing-history-close {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--choco);
+  color: var(--cream);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.closing-history-content { display: grid; gap: 12px; }
+.closing-history-card {
+  padding: 14px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .76);
+  border: 1px solid rgba(90, 43, 29, .12);
+}
+.closing-history-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.closing-history-card-head small { display: block; color: rgba(50, 22, 14, .62); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .8px; }
+.closing-history-card-head strong { display: block; margin-top: 4px; font-family: 'Russo One', Inter, sans-serif; font-size: 28px; color: var(--red); }
+.closing-history-card-head span { padding: 8px 12px; border-radius: 999px; background: var(--choco); color: var(--cream); font-weight: 900; }
+.closing-history-categories { display: grid; gap: 8px; margin-top: 12px; }
+.closing-history-category {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 250, 240, .8);
+}
+.closing-history-category strong { display: block; color: var(--choco); }
+.closing-history-category span { display: block; margin-top: 3px; color: rgba(50, 22, 14, .62); font-weight: 900; font-size: 12px; }
+.closing-history-category em { flex: 0 0 auto; font-style: normal; font-weight: 900; color: var(--red); }
+.closing-history-list { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+.closing-history-list li { font-weight: 900; color: var(--choco); }
+.closing-history-list span { display: block; color: rgba(50, 22, 14, .58); font-size: 12px; }
+.hidden { display: none !important; }
 @media (max-width: 760px) {
+  .closing-title-row { display: grid; }
+  .closing-history-button { width: 100%; }
   .closing-top { grid-template-columns: 1fr; }
   .closing-category { padding: 12px; border-radius: 24px; }
   .closing-category-head h3 { font-size: 24px; }
