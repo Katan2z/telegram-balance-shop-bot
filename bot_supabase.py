@@ -12,6 +12,7 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
 ROOT_ADMINS = {818748106, 747818163, 5311640125}
 ADMIN_STATES = {}
 TASK_NOTIFY_CHAT_TITLE = os.getenv("TASK_NOTIFY_CHAT_TITLE", "Администрация нбучей бутербродной")
+TASK_NOTIFY_SETTING_KEY = "task_notify_chat_id"
 router = Router()
 
 
@@ -148,16 +149,25 @@ async def answer(message, text, **kwargs):
         print(f"Telegram answer error: {error}")
 
 
+def get_task_notify_chat_id():
+    saved = db.get_setting(TASK_NOTIFY_SETTING_KEY)
+    if saved and saved.lstrip("-").isdigit():
+        return int(saved)
+    chat = db.find_chat_by_title(TASK_NOTIFY_CHAT_TITLE)
+    if chat:
+        return int(chat["chat_id"])
+    return None
+
+
 async def notify_new_tasks_loop(bot: Bot):
     await asyncio.sleep(5)
     while True:
         try:
-            chat = db.find_chat_by_title(TASK_NOTIFY_CHAT_TITLE)
-            if not chat:
-                print(f"Task notify chat not found: {TASK_NOTIFY_CHAT_TITLE}")
+            chat_id = get_task_notify_chat_id()
+            if not chat_id:
+                print("Task notify chat is not configured. Use /uved in target chat.")
                 await asyncio.sleep(60)
                 continue
-            chat_id = int(chat["chat_id"])
             for task in db.list_unnotified_admin_tasks(limit=10):
                 try:
                     await bot.send_message(chat_id, task_notify_text(task), parse_mode="HTML")
@@ -235,6 +245,25 @@ async def app_handler(message: Message):
     if message.from_user and db.enabled():
         db.upsert_user(message.from_user)
     await answer(message, "Открой личный чат с ботом и нажми кнопку меню «Спасибки».", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Открыть бота", url=bot_url())]]))
+
+
+@router.message(Command("uved"))
+async def uved_command(message: Message):
+    if message.chat.type == "private":
+        await answer(message, "Эту команду нужно отправить в беседе, куда должны приходить уведомления о задачах.")
+        return
+    if not message.from_user or not is_admin(message.from_user.id):
+        await answer(message, "⛔ Команда доступна только админам и менеджерам.")
+        return
+    if db.enabled():
+        db.upsert_user(message.from_user)
+        db.save_chat(message.chat)
+        db.set_setting(TASK_NOTIFY_SETTING_KEY, str(message.chat.id))
+    await answer(
+        message,
+        "✅ Уведомления о новых задачах будут приходить в эту беседу.\n"
+        f"Чат: {message.chat.title or message.chat.id}"
+    )
 
 
 @router.message(F.new_chat_members)
@@ -336,7 +365,7 @@ async def balance_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data == "help")
 async def help_callback(callback: CallbackQuery):
-    await callback.message.edit_text("/admin — админка\n/users — пользователи\n/add_balance user_id сумма — начислить спасибки", reply_markup=main_menu(callback.from_user.id))
+    await callback.message.edit_text("/admin — админка\n/users — пользователи\n/add_balance user_id сумма — начислить спасибки\n/uved — включить уведомления о задачах в текущей беседе", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
 
 
