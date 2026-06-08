@@ -225,6 +225,28 @@ def get_stats() -> dict:
     }
 
 
+def get_setting(key: str) -> str | None:
+    try:
+        rows = request("GET", f"bot_settings?key=eq.{quote(key, safe='')}&select=value&limit=1") or []
+    except RuntimeError as error:
+        print(f"Settings table unavailable: {error}")
+        return None
+    if not rows:
+        return None
+    value = rows[0].get("value")
+    return str(value) if value is not None else None
+
+
+def set_setting(key: str, value: str) -> None:
+    payload = {"key": key, "value": str(value), "updated_at": now()}
+    request(
+        "POST",
+        "bot_settings?on_conflict=key",
+        headers=headers("resolution=merge-duplicates"),
+        json=payload,
+    )
+
+
 def find_chat_by_title(title_part: str) -> dict | None:
     query = quote(f"%{title_part}%", safe="")
     rows = request("GET", f"chats?title=ilike.{query}&select=chat_id,title&type=neq.private&limit=1") or []
