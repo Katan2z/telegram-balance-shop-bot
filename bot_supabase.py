@@ -1,5 +1,6 @@
 import asyncio
 import os
+from html import escape
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
@@ -10,6 +11,7 @@ import supabase_storage as db
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
 ROOT_ADMINS = {818748106, 747818163, 5311640125}
 ADMIN_STATES = {}
+TASK_NOTIFY_CHAT_TITLE = os.getenv("TASK_NOTIFY_CHAT_TITLE", "Администрация нбучей бутербродной")
 router = Router()
 
 
@@ -73,6 +75,37 @@ def name_for(user_id):
         return "Сотрудник"
 
 
+def format_task_due(value):
+    if not value:
+        return "без срока"
+    text = str(value).replace("T", " ").replace("Z", "")
+    return text[:16]
+
+
+def task_notify_text(task: dict) -> str:
+    title = escape(str(task.get("title") or "Без названия"))
+    description = escape(str(task.get("description") or "").strip())
+    assignee = escape(name_for(task.get("assigned_to"))) if task.get("assigned_to") else "Не назначен"
+    creator = escape(name_for(task.get("created_by"))) if task.get("created_by") else "Неизвестно"
+    due = escape(format_task_due(task.get("due_at")))
+    lines = [
+        "🧩 <b>Новая задача</b>",
+        "",
+        f"<b>{title}</b>",
+    ]
+    if description:
+        lines.extend(["", description])
+    lines.extend([
+        "",
+        f"👤 Ответственный: <b>{assignee}</b>",
+        f"🕒 Срок: <b>{due}</b>",
+        f"✍️ Создал: <b>{creator}</b>",
+        "",
+        "Открой Mini App → Задачи",
+    ])
+    return "\n".join(lines)
+
+
 def users_text(limit=25):
     users = db.list_users() if db.enabled() else []
     if not users:
@@ -113,6 +146,28 @@ async def answer(message, text, **kwargs):
         await message.answer(text, **kwargs)
     except Exception as error:
         print(f"Telegram answer error: {error}")
+
+
+async def notify_new_tasks_loop(bot: Bot):
+    await asyncio.sleep(5)
+    while True:
+        try:
+            chat = db.find_chat_by_title(TASK_NOTIFY_CHAT_TITLE)
+            if not chat:
+                print(f"Task notify chat not found: {TASK_NOTIFY_CHAT_TITLE}")
+                await asyncio.sleep(60)
+                continue
+            chat_id = int(chat["chat_id"])
+            for task in db.list_unnotified_admin_tasks(limit=10):
+                try:
+                    await bot.send_message(chat_id, task_notify_text(task), parse_mode="HTML")
+                    db.mark_admin_task_notified(int(task["id"]))
+                except Exception as error:
+                    print(f"Task notification send error: {error}")
+            await asyncio.sleep(15)
+        except Exception as error:
+            print(f"Task notification loop error: {error}")
+            await asyncio.sleep(30)
 
 
 async def handle_payload(message, payload):
@@ -351,6 +406,7 @@ async def main():
     bot = Bot(token=token)
     dp = Dispatcher()
     dp.include_router(router)
+    asyncio.create_task(notify_new_tasks_loop(bot))
     await dp.start_polling(bot)
 
 
