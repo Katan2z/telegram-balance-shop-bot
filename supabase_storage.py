@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import requests
 
@@ -223,3 +223,26 @@ def get_stats() -> dict:
         "chats_count": len(chats),
         "total_balance": sum(int(user.get("balance", 0) or 0) for user in users),
     }
+
+
+def find_chat_by_title(title_part: str) -> dict | None:
+    query = quote(f"%{title_part}%", safe="")
+    rows = request("GET", f"chats?title=ilike.{query}&select=chat_id,title&type=neq.private&limit=1") or []
+    return rows[0] if rows else None
+
+
+def list_unnotified_admin_tasks(limit: int = 10) -> list[dict]:
+    return request(
+        "GET",
+        "admin_tasks?select=id,title,description,assigned_to,due_at,created_by,created_at,notified_at"
+        f"&notified_at=is.null&order=created_at.asc&limit={limit}",
+    ) or []
+
+
+def mark_admin_task_notified(task_id: int) -> None:
+    request(
+        "PATCH",
+        f"admin_tasks?id=eq.{int(task_id)}",
+        headers=headers("return=minimal"),
+        json={"notified_at": now()},
+    )
