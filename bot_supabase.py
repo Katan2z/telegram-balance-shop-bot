@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import datetime, timedelta
 from html import escape
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -13,6 +14,7 @@ ROOT_ADMINS = {818748106, 747818163, 5311640125}
 ADMIN_STATES = {}
 TASK_NOTIFY_CHAT_TITLE = os.getenv("TASK_NOTIFY_CHAT_TITLE", "Администрация нбучей бутербродной")
 TASK_NOTIFY_SETTING_KEY = "task_notify_chat_id"
+MOSCOW_OFFSET = timedelta(hours=3)
 router = Router()
 
 
@@ -76,6 +78,36 @@ def name_for(user_id):
         return "Сотрудник"
 
 
+def moscow_now():
+    return datetime.utcnow() + MOSCOW_OFFSET
+
+
+def month_key_for(dt: datetime) -> str:
+    return dt.strftime("%Y-%m")
+
+
+def is_last_day(dt: datetime) -> bool:
+    return (dt + timedelta(days=1)).day == 1
+
+
+def should_run_monthly_conversion(dt: datetime | None = None) -> bool:
+    local = dt or moscow_now()
+    return is_last_day(local) and local.hour >= 23 and local.minute >= 50
+
+
+def conversion_text(result: dict) -> str:
+    if result.get("already_done"):
+        return f"🪙 Конвертация за {result.get('month_key')} уже была выполнена."
+    return (
+        f"🪙 Конвертация спасибок за {result.get('month_key')} выполнена\n\n"
+        f"Сотрудников с балансом: {result.get('converted_users', 0)}\n"
+        f"Списано спасибок: {result.get('total_spasibki', 0)}\n"
+        f"Начислено монеток: {result.get('total_coins', 0)}\n"
+        f"Сгорело остатком: {result.get('total_burned', 0)}\n\n"
+        "Курс: 5 спасибок = 1 монетка"
+    )
+
+
 def format_task_due(value):
     if not value:
         return "без срока"
@@ -115,19 +147,29 @@ def users_text(limit=25):
     for user in users[:limit]:
         username = user.get("username")
         nick = f"@{username}" if username else "без username"
-        lines.append(f"{user.get('telegram_id')} | {user.get('first_name') or 'Без имени'} | {nick} | баланс: {user.get('balance', 0)}")
+        lines.append(
+            f"{user.get('telegram_id')} | {user.get('first_name') or 'Без имени'} | {nick} | "
+            f"спасибки: {user.get('balance', 0)} | монетки: {user.get('coins', 0)}"
+        )
     return "\n".join(lines)
 
 
 def stats_text():
-    stats = db.get_stats() if db.enabled() else {"users_count": 0, "chats_count": 0, "transactions_count": 0, "total_balance": 0}
+    stats = db.get_stats() if db.enabled() else {
+        "users_count": 0,
+        "chats_count": 0,
+        "transactions_count": 0,
+        "total_balance": 0,
+        "total_coins": 0,
+    }
     return (
         "📊 Статистика\n\n"
         f"Хранилище: Supabase\n"
         f"Пользователей: {stats['users_count']}\n"
         f"Чатов: {stats['chats_count']}\n"
         f"Операций: {stats['transactions_count']}\n"
-        f"Общий баланс: {stats['total_balance']}\n"
+        f"Общий баланс спасибок: {stats['total_balance']}\n"
+        f"Монеток у команды: {stats.get('total_coins', 0)}\n"
         f"Менеджеров: {len(db.manager_ids()) if db.enabled() else 0}"
     )
 
@@ -178,6 +220,23 @@ async def notify_new_tasks_loop(bot: Bot):
         except Exception as error:
             print(f"Task notification loop error: {error}")
             await asyncio.sleep(30)
+
+
+async def monthly_conversion_loop(bot: Bot):
+    await asyncio.sleep(10)
+    while True:
+        try:
+            local = moscow_now()
+            month_key = month_key_for(local)
+            if should_run_monthly_conversion(local) and not db.monthly_conversion_exists(month_key):
+                result = db.run_monthly_coin_conversion(month_key)
+                chat_id = get_task_notify_chat_id()
+                if chat_id:
+                    await bot.send_message(chat_id, conversion_text(result))
+            await asyncio.sleep(60)
+        except Exception as error:
+            print(f"Monthly conversion loop error: {error}")
+            await asyncio.sleep(60)
 
 
 async def handle_payload(message, payload):
@@ -261,9 +320,24 @@ async def uved_command(message: Message):
         db.set_setting(TASK_NOTIFY_SETTING_KEY, str(message.chat.id))
     await answer(
         message,
-        "✅ Уведомления о новых задачах будут приходить в эту беседу.\n"
+        "✅ Уведомления о новых задачах и конвертации будут приходить в эту беседу.\n"
         f"Чат: {message.chat.title or message.chat.id}"
     )
+
+
+@router.message(Command("convert_month"))
+async def convert_month_command(message: Message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        await answer(message, "⛔ Нет доступа.")
+        return
+    local = moscow_now()
+    month_key = month_key_for(local)
+    try:
+        result = db.run_monthly_coin_conversion(month_key)
+    except Exception as error:
+        await answer(message, f"Не получилось выполнить конвертацию: {error}")
+        return
+    await answer(message, conversion_text(result))
 
 
 @router.message(F.new_chat_members)
@@ -359,13 +433,21 @@ async def menu_callback(callback: CallbackQuery):
 async def balance_callback(callback: CallbackQuery):
     if db.enabled():
         db.upsert_user(callback.from_user)
-    await callback.message.edit_text(f"Баланс: {db.get_balance(callback.from_user.id) if db.enabled() else 0}", reply_markup=main_menu(callback.from_user.id))
+    balance = db.get_balance(callback.from_user.id) if db.enabled() else 0
+    await callback.message.edit_text(f"Спасибки: {balance}", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
 
 
 @router.callback_query(F.data == "help")
 async def help_callback(callback: CallbackQuery):
-    await callback.message.edit_text("/admin — админка\n/users — пользователи\n/add_balance user_id сумма — начислить спасибки\n/uved — включить уведомления о задачах в текущей беседе", reply_markup=main_menu(callback.from_user.id))
+    await callback.message.edit_text(
+        "/admin — админка\n"
+        "/users — пользователи\n"
+        "/add_balance user_id сумма — начислить спасибки\n"
+        "/uved — включить уведомления о задачах в текущей беседе\n"
+        "/convert_month — вручную выполнить конвертацию спасибок в монетки",
+        reply_markup=main_menu(callback.from_user.id),
+    )
     await callback.answer()
 
 
@@ -436,6 +518,7 @@ async def main():
     dp = Dispatcher()
     dp.include_router(router)
     asyncio.create_task(notify_new_tasks_loop(bot))
+    asyncio.create_task(monthly_conversion_loop(bot))
     await dp.start_polling(bot)
 
 
