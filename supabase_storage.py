@@ -94,6 +94,45 @@ def save_chat(chat) -> None:
     request("POST", "chats?on_conflict=chat_id", headers=headers("resolution=merge-duplicates"), json=payload)
 
 
+def auto_convert_user_balance(user_id: int) -> dict:
+    rows = request("GET", f"users?telegram_id=eq.{user_id}&select=balance,coins&limit=1") or []
+    if not rows:
+        return {"balance": 0, "coins": 0, "added_coins": 0, "converted_spasibki": 0}
+    row = rows[0]
+    balance = int(row.get("balance", 0) or 0)
+    current_coins = int(row.get("coins", 0) or 0)
+    coins_to_add = balance // 5
+    if coins_to_add <= 0:
+        return {"balance": balance, "coins": current_coins, "added_coins": 0, "converted_spasibki": 0}
+    remaining_balance = balance % 5
+    new_coins = current_coins + coins_to_add
+    request(
+        "PATCH",
+        f"users?telegram_id=eq.{user_id}",
+        headers=headers("return=minimal"),
+        json={"balance": remaining_balance, "coins": new_coins, "updated_at": now()},
+    )
+    request(
+        "POST",
+        "transactions",
+        headers=headers("return=minimal"),
+        json={
+            "user_id": user_id,
+            "amount": -coins_to_add * 5,
+            "type": "coins_auto_convert",
+            "comment": f"Автоконвертация: {coins_to_add * 5} спасибок → {coins_to_add} монеток",
+            "admin_id": None,
+            "created_at": now(),
+        },
+    )
+    return {
+        "balance": remaining_balance,
+        "coins": new_coins,
+        "added_coins": coins_to_add,
+        "converted_spasibki": coins_to_add * 5,
+    }
+
+
 def change_balance(user_id: int, amount: int, admin_id: int | None = None, comment: str = "") -> int:
     if amount == 0:
         raise ValueError("Сумма не может быть 0")
@@ -104,7 +143,8 @@ def change_balance(user_id: int, amount: int, admin_id: int | None = None, comme
         raise ValueError("Недостаточно средств")
     payload = {"user_id": user_id, "amount": amount, "type": "balance_change", "comment": comment, "admin_id": admin_id, "created_at": now()}
     request("POST", "transactions", headers=headers("return=representation"), json=payload)
-    return get_balance(user_id)
+    conversion = auto_convert_user_balance(user_id)
+    return int(conversion.get("balance", get_balance(user_id)))
 
 
 def get_balance(user_id: int) -> int:
@@ -125,7 +165,7 @@ def get_user_name(user_id: int) -> str:
 
 
 def list_users() -> list[dict]:
-    return request("GET", "users?select=telegram_id,username,first_name,last_name,balance,coins,updated_at&order=updated_at.desc") or []
+    return request("GET", "users?select=telegram_id,username,first_name,last_name,balance,coins,updated_at&order=balance.desc") or []
 
 
 def list_transactions(limit: int = 10) -> list[dict]:
@@ -218,33 +258,28 @@ def run_monthly_coin_conversion(month_key: str) -> dict:
 
     users = request("GET", "users?select=telegram_id,balance,coins") or []
     total_spasibki = 0
-    total_coins = 0
     total_burned = 0
     converted_users = 0
 
     for user in users:
         user_id = int(user["telegram_id"])
         balance = int(user.get("balance", 0) or 0)
-        current_coins = int(user.get("coins", 0) or 0)
-        coins_to_add = balance // 5
-        burned = balance % 5
         if balance > 0:
             converted_users += 1
             total_spasibki += balance
-            total_coins += coins_to_add
-            total_burned += burned
+            total_burned += balance
         request(
             "PATCH",
             f"users?telegram_id=eq.{user_id}",
             headers=headers("return=minimal"),
-            json={"balance": 0, "coins": current_coins + coins_to_add, "updated_at": now()},
+            json={"balance": 0, "updated_at": now()},
         )
 
     payload = {
         "month_key": month_key,
         "converted_users": converted_users,
         "total_spasibki": total_spasibki,
-        "total_coins": total_coins,
+        "total_coins": 0,
         "total_burned": total_burned,
         "created_at": now(),
     }
