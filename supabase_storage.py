@@ -12,21 +12,17 @@ def normalize_supabase_url(value: str) -> str:
         return ""
     parsed = urlparse(raw)
     path_parts = [part for part in parsed.path.split("/") if part]
-
     if parsed.netloc in {"supabase.com", "www.supabase.com"} and len(path_parts) >= 3:
         if path_parts[0] == "dashboard" and path_parts[1] == "project":
             return f"https://{path_parts[2]}.supabase.co"
-
     if parsed.netloc == "app.supabase.com" and len(path_parts) >= 2:
         if path_parts[0] == "project":
             return f"https://{path_parts[1]}.supabase.co"
-
     return raw
 
 
 SUPABASE_URL = normalize_supabase_url(os.getenv("SUPABASE_URL", ""))
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or ""
-
 DEFAULT_TIMEOUT = 15
 
 
@@ -57,10 +53,7 @@ def headers(prefer: str | None = None) -> dict[str, str]:
 
 def request(method: str, path: str, **kwargs) -> Any:
     if not SUPABASE_URL.endswith(".supabase.co"):
-        raise RuntimeError(
-            "SUPABASE_URL должен быть Project URL вида https://PROJECT_REF.supabase.co, "
-            "а не ссылкой на dashboard."
-        )
+        raise RuntimeError("SUPABASE_URL должен быть Project URL вида https://PROJECT_REF.supabase.co, а не ссылкой на dashboard.")
     url = f"{SUPABASE_URL}/rest/v1/{path}"
     response = requests.request(method, url, headers=kwargs.pop("headers", headers()), timeout=DEFAULT_TIMEOUT, **kwargs)
     if response.status_code >= 400:
@@ -80,60 +73,25 @@ def upsert_user_record(record: dict) -> dict:
         "balance": int(record.get("balance", 0) or 0),
         "updated_at": record.get("updated_at") or now(),
     }
-    rows = request(
-        "POST",
-        "users?on_conflict=telegram_id",
-        headers=headers("resolution=merge-duplicates,return=representation"),
-        json=payload,
-    )
+    rows = request("POST", "users?on_conflict=telegram_id", headers=headers("resolution=merge-duplicates,return=representation"), json=payload)
     return rows[0] if rows else payload
 
 
 def upsert_user(user) -> dict:
-    payload = {
-        "telegram_id": user.id,
-        "username": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "updated_at": now(),
-    }
-    rows = request(
-        "POST",
-        "users?on_conflict=telegram_id",
-        headers=headers("resolution=merge-duplicates,return=representation"),
-        json=payload,
-    )
+    payload = {"telegram_id": user.id, "username": user.username, "first_name": user.first_name, "last_name": user.last_name, "updated_at": now()}
+    rows = request("POST", "users?on_conflict=telegram_id", headers=headers("resolution=merge-duplicates,return=representation"), json=payload)
     return rows[0] if rows else payload
 
 
 def upsert_unknown_user(user_id: int) -> None:
-    payload = {
-        "telegram_id": user_id,
-        "updated_at": now(),
-    }
-    request(
-        "POST",
-        "users?on_conflict=telegram_id",
-        headers=headers("resolution=merge-duplicates"),
-        json=payload,
-    )
+    request("POST", "users?on_conflict=telegram_id", headers=headers("resolution=merge-duplicates"), json={"telegram_id": user_id, "updated_at": now()})
 
 
 def save_chat(chat) -> None:
     if chat.type == "private":
         return
-    payload = {
-        "chat_id": chat.id,
-        "title": chat.title,
-        "type": chat.type,
-        "updated_at": now(),
-    }
-    request(
-        "POST",
-        "chats?on_conflict=chat_id",
-        headers=headers("resolution=merge-duplicates"),
-        json=payload,
-    )
+    payload = {"chat_id": chat.id, "title": chat.title, "type": chat.type, "updated_at": now()}
+    request("POST", "chats?on_conflict=chat_id", headers=headers("resolution=merge-duplicates"), json=payload)
 
 
 def change_balance(user_id: int, amount: int, admin_id: int | None = None, comment: str = "") -> int:
@@ -144,14 +102,7 @@ def change_balance(user_id: int, amount: int, admin_id: int | None = None, comme
     current_balance = int(user_rows[0].get("balance", 0)) if user_rows else 0
     if current_balance + amount < 0:
         raise ValueError("Недостаточно средств")
-    payload = {
-        "user_id": user_id,
-        "amount": amount,
-        "type": "balance_change",
-        "comment": comment,
-        "admin_id": admin_id,
-        "created_at": now(),
-    }
+    payload = {"user_id": user_id, "amount": amount, "type": "balance_change", "comment": comment, "admin_id": admin_id, "created_at": now()}
     request("POST", "transactions", headers=headers("return=representation"), json=payload)
     return get_balance(user_id)
 
@@ -193,12 +144,7 @@ def manager_ids() -> set[int]:
 def add_manager(user_id: int, created_by: int | None = None) -> None:
     upsert_unknown_user(user_id)
     payload = {"telegram_id": user_id, "created_by": created_by, "created_at": now()}
-    request(
-        "POST",
-        "managers?on_conflict=telegram_id",
-        headers=headers("resolution=merge-duplicates"),
-        json=payload,
-    )
+    request("POST", "managers?on_conflict=telegram_id", headers=headers("resolution=merge-duplicates"), json=payload)
 
 
 def remove_manager(user_id: int) -> None:
@@ -240,12 +186,7 @@ def get_setting(key: str) -> str | None:
 
 def set_setting(key: str, value: str) -> None:
     payload = {"key": key, "value": str(value), "updated_at": now()}
-    request(
-        "POST",
-        "bot_settings?on_conflict=key",
-        headers=headers("resolution=merge-duplicates"),
-        json=payload,
-    )
+    request("POST", "bot_settings?on_conflict=key", headers=headers("resolution=merge-duplicates"), json=payload)
 
 
 def find_chat_by_title(title_part: str) -> dict | None:
@@ -263,12 +204,7 @@ def list_unnotified_admin_tasks(limit: int = 10) -> list[dict]:
 
 
 def mark_admin_task_notified(task_id: int) -> None:
-    request(
-        "PATCH",
-        f"admin_tasks?id=eq.{int(task_id)}",
-        headers=headers("return=minimal"),
-        json={"notified_at": now()},
-    )
+    request("PATCH", f"admin_tasks?id=eq.{int(task_id)}", headers=headers("return=minimal"), json={"notified_at": now()})
 
 
 def monthly_conversion_exists(month_key: str) -> bool:
@@ -303,20 +239,6 @@ def run_monthly_coin_conversion(month_key: str) -> dict:
             headers=headers("return=minimal"),
             json={"balance": 0, "coins": current_coins + coins_to_add, "updated_at": now()},
         )
-        if balance > 0:
-            request(
-                "POST",
-                "transactions",
-                headers=headers("return=minimal"),
-                json={
-                    "user_id": user_id,
-                    "amount": -balance,
-                    "type": "monthly_coin_conversion",
-                    "comment": f"Конвертация {month_key}: +{coins_to_add} монет, сгорело {burned}",
-                    "admin_id": None,
-                    "created_at": now(),
-                },
-            )
 
     payload = {
         "month_key": month_key,
