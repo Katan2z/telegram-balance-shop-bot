@@ -91,7 +91,7 @@ function preserveSelectValue(select, html) {
 
 async function loadSupabaseData() {
   const [usersRows, managerRows] = await Promise.all([
-    supabaseFetch("users?select=telegram_id,username,first_name,last_name,balance,updated_at&order=balance.desc"),
+    supabaseFetch("users?select=telegram_id,username,first_name,last_name,balance,coins,updated_at&order=balance.desc"),
     supabaseFetch("managers?select=telegram_id,created_by,created_at"),
   ]);
 
@@ -99,9 +99,11 @@ async function loadSupabaseData() {
   for (const row of usersRows) {
     const id = String(row.telegram_id);
     const balance = Number(row.balance || 0);
+    const coins = Number(row.coins || 0);
     users[id] = {
       name: userNameFromRow(row),
       balance,
+      coins,
       received_month: balance,
       received_total: balance,
     };
@@ -182,14 +184,15 @@ function renderMyStats(data) {
   }
   const rank = getUserRank(data, userId);
   const balance = Number(publicUser.balance || 0);
+  const coins = Number(publicUser.coins || 0);
   const total = Number(publicUser.received_total || balance || 0);
   setText("balance", balance);
   root.innerHTML = `
     <div class="stat-grid">
-      <div class="stat-tile"><small>Баланс</small><strong>${balance}</strong><span>доступно</span></div>
+      <div class="stat-tile"><small>Спасибки</small><strong>${balance}</strong><span>до конца месяца</span></div>
+      <div class="stat-tile"><small>Монетки</small><strong>${coins}</strong><span>для магазина</span></div>
       <div class="stat-tile"><small>Место</small><strong>${rank ? `#${rank}` : "—"}</strong><span>в рейтинге</span></div>
-      <div class="stat-tile"><small>Результат</small><strong>${balance}</strong><span>сейчас</span></div>
-      <div class="stat-tile"><small>Всего</small><strong>${total}</strong><span>за всё время</span></div>
+      <div class="stat-tile"><small>Курс</small><strong>5:1</strong><span>спасибки → монетка</span></div>
     </div>
   `;
 }
@@ -217,110 +220,75 @@ function ensureAdminTabs(data) {
 function setupAdmin(data) {
   if (!isAdmin(data)) return;
   ensureAdminTabs(data);
-
   const select = document.getElementById("adminUser");
-  const optionsHtml = Object.entries(data.users || {}).map(([id, item]) => {
-    const label = `${item.name || "Сотрудник"} · баланс ${item.balance || 0}`;
-    return `<option value="${htmlEscape(id)}">${htmlEscape(label)}</option>`;
-  }).join("");
-  preserveSelectValue(select, optionsHtml);
-
-  const amountInput = document.getElementById("adminAmount");
+  const amount = document.getElementById("adminAmount");
   const status = document.getElementById("adminStatus");
+  const options = Object.entries(data.users).map(([id, item]) => `<option value="${id}">${htmlEscape(item.name)} — ${Number(item.balance || 0)} спасибок</option>`).join("");
+  preserveSelectValue(select, options);
 
-  function sendChange(direction) {
-    const targetUserId = select.value;
-    const amount = Number(amountInput.value || 0);
-    if (!targetUserId || !amount || amount <= 0) {
-      status.textContent = "Укажи сотрудника и сумму";
+  document.getElementById("adminAdd").onclick = () => {
+    const value = Math.abs(Number(amount.value || 0));
+    if (!select.value || !value) {
+      status.textContent = "Выбери сотрудника и сумму.";
       return;
     }
-    const realAmount = direction * amount;
-    status.textContent = "Открываю бота для подтверждения";
-    openBotDeepLink(`admin_${targetUserId}_${realAmount}`);
-  }
+    openBotDeepLink(`admin_${select.value}_${value}`);
+  };
 
-  document.getElementById("adminAdd").onclick = () => sendChange(1);
-  document.getElementById("adminRemove").onclick = () => sendChange(-1);
+  document.getElementById("adminRemove").onclick = () => {
+    const value = Math.abs(Number(amount.value || 0));
+    if (!select.value || !value) {
+      status.textContent = "Выбери сотрудника и сумму.";
+      return;
+    }
+    openBotDeepLink(`admin_${select.value}_${-value}`);
+  };
+
+  setupManagers(data);
 }
 
 function setupManagers(data) {
   if (!isRootAdmin(data)) return;
-
   const select = document.getElementById("managerUser");
   const status = document.getElementById("managerStatus");
   const list = document.getElementById("managersList");
-  if (!select || !status || !list) return;
+  const options = Object.entries(data.users).map(([id, item]) => `<option value="${id}">${htmlEscape(item.name)} — ${id}</option>`).join("");
+  preserveSelectValue(select, options);
 
-  const adminIds = new Set((data.admin_ids || []).map(String));
-  const rootIds = new Set((data.root_admin_ids || []).map(String));
-
-  const optionsHtml = Object.entries(data.users || {}).map(([id, item]) => {
-    const role = rootIds.has(id) ? " · главный админ" : (adminIds.has(id) ? " · менеджер" : "");
-    return `<option value="${htmlEscape(id)}">${htmlEscape((item.name || "Сотрудник") + role)}</option>`;
-  }).join("");
-  preserveSelectValue(select, optionsHtml);
+  const managerSet = new Set((data.managers || []).map(row => String(row.telegram_id)));
+  list.innerHTML = [...managerSet].map(id => {
+    const user = data.users[id] || { name: `ID ${id}` };
+    return `<div class="item"><strong>${htmlEscape(user.name)}</strong><span>${id}</span></div>`;
+  }).join("") || `<p>Менеджеров пока нет.</p>`;
 
   document.getElementById("managerAdd").onclick = () => {
-    const targetUserId = select.value;
-    if (!targetUserId) {
-      status.textContent = "Выбери сотрудника";
+    if (!select.value) {
+      status.textContent = "Выбери сотрудника.";
       return;
     }
-    status.textContent = "Открываю бота для выдачи прав";
-    openBotDeepLink(`manager_add_${targetUserId}`);
+    openBotDeepLink(`manager_add_${select.value}`);
   };
-
   document.getElementById("managerRemove").onclick = () => {
-    const targetUserId = select.value;
-    if (!targetUserId) {
-      status.textContent = "Выбери сотрудника";
+    if (!select.value) {
+      status.textContent = "Выбери сотрудника.";
       return;
     }
-    if (rootIds.has(String(targetUserId))) {
-      status.textContent = "Главного админа нельзя убрать";
-      return;
-    }
-    status.textContent = "Открываю бота для снятия прав";
-    openBotDeepLink(`manager_remove_${targetUserId}`);
+    openBotDeepLink(`manager_remove_${select.value}`);
   };
-
-  const rows = Object.entries(data.users || {})
-    .filter(([id]) => adminIds.has(String(id)))
-    .map(([id, item]) => `
-      <div class="rank manager-row">
-        ${avatar(item.name)}
-        <div>
-          <strong>${htmlEscape(item.name || "Сотрудник")}</strong>
-          <span>ID: ${htmlEscape(id)}${rootIds.has(String(id)) ? " · главный админ" : " · менеджер"}</span>
-        </div>
-      </div>
-    `).join("");
-
-  list.innerHTML = rows || `<p>Менеджеров пока нет.</p>`;
 }
 
-async function refreshData() {
+async function render() {
   const data = await loadData();
+  renderMyStats(data);
   renderTop(data.top_month);
   renderHero(data.top_month);
-  renderMyStats(data);
   setupAdmin(data);
-  setupManagers(data);
 }
 
-async function main() {
-  setText("userName", user ? `${user.first_name}` : "Спасибки");
-  try {
-    await refreshData();
-    setInterval(() => refreshData().catch(() => {}), 5000);
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) refreshData().catch(() => {});
-    });
-  } catch (error) {
-    document.getElementById("topMonth").innerHTML = `<p>Нет данных.</p>`;
-    document.getElementById("myStats").innerHTML = `<p>Нет данных.</p>`;
-  }
-}
+render().catch(error => {
+  document.getElementById("myStats").innerHTML = `<p>${htmlEscape(error.message)}</p>`;
+});
 
-main();
+setInterval(() => {
+  render().catch(() => {});
+}, 10000);
