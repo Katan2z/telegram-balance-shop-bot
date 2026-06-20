@@ -112,19 +112,6 @@ def auto_convert_user_balance(user_id: int) -> dict:
         headers=headers("return=minimal"),
         json={"balance": remaining_balance, "coins": new_coins, "updated_at": now()},
     )
-    request(
-        "POST",
-        "transactions",
-        headers=headers("return=minimal"),
-        json={
-            "user_id": user_id,
-            "amount": -coins_to_add * 5,
-            "type": "coins_auto_convert",
-            "comment": f"Автоконвертация: {coins_to_add * 5} спасибок → {coins_to_add} монеток",
-            "admin_id": None,
-            "created_at": now(),
-        },
-    )
     return {
         "balance": remaining_balance,
         "coins": new_coins,
