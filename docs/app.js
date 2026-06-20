@@ -186,15 +186,14 @@ function renderMyStats(data) {
   const rank = getUserRank(data, userId);
   const balance = Number(publicUser.balance || 0);
   const coins = Number(publicUser.coins || 0);
-  const total = Number(publicUser.received_total || balance || 0);
   setText("balance", balance);
   setText("coinsBalance", coins);
   root.innerHTML = `
     <div class="stat-grid">
-      <div class="stat-tile"><small>Спасибки</small><strong>${balance}</strong><span>до конца месяца</span></div>
+      <div class="stat-tile"><small>Спасибки</small><strong>${balance}</strong><span>остаток до 5</span></div>
       <div class="stat-tile"><small>Монетки</small><strong>${coins}</strong><span>для магазина</span></div>
       <div class="stat-tile"><small>Место</small><strong>${rank ? `#${rank}` : "—"}</strong><span>в рейтинге</span></div>
-      <div class="stat-tile"><small>Курс</small><strong>5:1</strong><span>спасибки → монетка</span></div>
+      <div class="stat-tile"><small>Курс</small><strong>5:1</strong><span>сразу в монетки</span></div>
     </div>
   `;
 }
