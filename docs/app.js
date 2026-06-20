@@ -180,6 +180,7 @@ function renderMyStats(data) {
   if (!userId || !publicUser) {
     root.innerHTML = `<p>Нет данных. Открой приложение через Telegram и нажми /start у бота.</p>`;
     setText("balance", 0);
+    setText("coinsBalance", 0);
     return;
   }
   const rank = getUserRank(data, userId);
@@ -187,6 +188,7 @@ function renderMyStats(data) {
   const coins = Number(publicUser.coins || 0);
   const total = Number(publicUser.received_total || balance || 0);
   setText("balance", balance);
+  setText("coinsBalance", coins);
   root.innerHTML = `
     <div class="stat-grid">
       <div class="stat-tile"><small>Спасибки</small><strong>${balance}</strong><span>до конца месяца</span></div>
