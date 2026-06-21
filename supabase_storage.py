@@ -95,28 +95,32 @@ def save_chat(chat) -> None:
 
 
 def auto_convert_user_balance(user_id: int) -> dict:
-    rows = request("GET", f"users?telegram_id=eq.{user_id}&select=balance,coins&limit=1") or []
+    rows = request("GET", f"users?telegram_id=eq.{user_id}&select=balance,coins,coin_checkpoint&limit=1") or []
     if not rows:
-        return {"balance": 0, "coins": 0, "added_coins": 0, "converted_spasibki": 0}
+        return {"balance": 0, "coins": 0, "added_coins": 0, "checkpoint": 0}
+
     row = rows[0]
     balance = int(row.get("balance", 0) or 0)
     current_coins = int(row.get("coins", 0) or 0)
-    coins_to_add = balance // 5
+    checkpoint = int(row.get("coin_checkpoint", 0) or 0)
+    earned_checkpoint = balance // 5
+    coins_to_add = max(earned_checkpoint - checkpoint, 0)
+
     if coins_to_add <= 0:
-        return {"balance": balance, "coins": current_coins, "added_coins": 0, "converted_spasibki": 0}
-    remaining_balance = balance % 5
+        return {"balance": balance, "coins": current_coins, "added_coins": 0, "checkpoint": checkpoint}
+
     new_coins = current_coins + coins_to_add
     request(
         "PATCH",
         f"users?telegram_id=eq.{user_id}",
         headers=headers("return=minimal"),
-        json={"balance": remaining_balance, "coins": new_coins, "updated_at": now()},
+        json={"coins": new_coins, "coin_checkpoint": earned_checkpoint, "updated_at": now()},
     )
     return {
-        "balance": remaining_balance,
+        "balance": balance,
         "coins": new_coins,
         "added_coins": coins_to_add,
-        "converted_spasibki": coins_to_add * 5,
+        "checkpoint": earned_checkpoint,
     }
 
 
@@ -152,7 +156,7 @@ def get_user_name(user_id: int) -> str:
 
 
 def list_users() -> list[dict]:
-    return request("GET", "users?select=telegram_id,username,first_name,last_name,balance,coins,updated_at&order=balance.desc") or []
+    return request("GET", "users?select=telegram_id,username,first_name,last_name,balance,coins,coin_checkpoint,updated_at&order=balance.desc") or []
 
 
 def list_transactions(limit: int = 10) -> list[dict]:
@@ -243,7 +247,7 @@ def run_monthly_coin_conversion(month_key: str) -> dict:
     if monthly_conversion_exists(month_key):
         return {"ok": False, "already_done": True, "month_key": month_key}
 
-    users = request("GET", "users?select=telegram_id,balance,coins") or []
+    users = request("GET", "users?select=telegram_id,balance,coins,coin_checkpoint") or []
     total_spasibki = 0
     total_burned = 0
     converted_users = 0
@@ -259,7 +263,7 @@ def run_monthly_coin_conversion(month_key: str) -> dict:
             "PATCH",
             f"users?telegram_id=eq.{user_id}",
             headers=headers("return=minimal"),
-            json={"balance": 0, "updated_at": now()},
+            json={"balance": 0, "coin_checkpoint": 0, "updated_at": now()},
         )
 
     payload = {
