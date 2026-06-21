@@ -190,10 +190,10 @@ function renderMyStats(data) {
   setText("coinsBalance", coins);
   root.innerHTML = `
     <div class="stat-grid">
-      <div class="stat-tile"><small>Спасибки</small><strong>${balance}</strong><span>остаток до 5</span></div>
+      <div class="stat-tile"><small>Спасибки</small><strong>${balance}</strong><span>за этот месяц</span></div>
       <div class="stat-tile"><small>Монетки</small><strong>${coins}</strong><span>для магазина</span></div>
       <div class="stat-tile"><small>Место</small><strong>${rank ? `#${rank}` : "—"}</strong><span>в рейтинге</span></div>
-      <div class="stat-tile"><small>Курс</small><strong>5:1</strong><span>сразу в монетки</span></div>
+      <div class="stat-tile"><small>Курс</small><strong>5:1</strong><span>монетки сверху</span></div>
     </div>
   `;
 }
@@ -258,8 +258,8 @@ function setupManagers(data) {
 
   const managerSet = new Set((data.managers || []).map(row => String(row.telegram_id)));
   list.innerHTML = [...managerSet].map(id => {
-    const user = data.users[id] || { name: `ID ${id}` };
-    return `<div class="item"><strong>${htmlEscape(user.name)}</strong><span>${id}</span></div>`;
+    const item = data.users[id] || { name: "Сотрудник" };
+    return `<div class="manager-row"><strong>${htmlEscape(item.name)}</strong><span>${id}</span></div>`;
   }).join("") || `<p>Менеджеров пока нет.</p>`;
 
   document.getElementById("managerAdd").onclick = () => {
@@ -269,6 +269,7 @@ function setupManagers(data) {
     }
     openBotDeepLink(`manager_add_${select.value}`);
   };
+
   document.getElementById("managerRemove").onclick = () => {
     if (!select.value) {
       status.textContent = "Выбери сотрудника.";
@@ -278,18 +279,18 @@ function setupManagers(data) {
   };
 }
 
-async function render() {
-  const data = await loadData();
-  renderMyStats(data);
-  renderTop(data.top_month);
-  renderHero(data.top_month);
-  setupAdmin(data);
+async function renderApp() {
+  try {
+    const data = await loadData();
+    renderMyStats(data);
+    renderTop(data.top_month);
+    renderHero(data.top_month);
+    setupAdmin(data);
+  } catch (error) {
+    setText("userName", "Не удалось загрузить данные");
+  }
 }
 
-render().catch(error => {
-  document.getElementById("myStats").innerHTML = `<p>${htmlEscape(error.message)}</p>`;
-});
-
-setInterval(() => {
-  render().catch(() => {});
-}, 10000);
+if (user) setText("userName", user.first_name || user.username || "Сотрудник");
+renderApp();
+setInterval(renderApp, 10000);
