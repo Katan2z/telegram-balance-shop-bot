@@ -1,0 +1,27 @@
+.my-klokr-panel { padding: 16px; overflow: visible; }
+.my-klokr-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 20px; border-radius: 32px; background: linear-gradient(135deg, #fff7df, #ffe0a0); border: 1px solid rgba(90,43,29,.12); box-shadow: 0 16px 34px rgba(50,22,14,.10); }
+.my-klokr-hero h2 { margin: 0; font-family: 'Russo One', Inter, sans-serif; color: var(--choco); font-size: clamp(34px, 7vw, 64px); line-height: .95; }
+.my-klokr-hero p:not(.instructor-kicker) { margin: 8px 0 0; color: rgba(50,22,14,.68); font-weight: 900; max-width: 640px; }
+.my-klokr-list { display: grid; gap: 12px; margin-top: 14px; }
+.my-klokr-card { display: grid; grid-template-columns: 84px 1fr; gap: 14px; padding: 14px; border-radius: 28px; background: linear-gradient(135deg, #fffdf8, #fff0d3); border: 1px solid rgba(90,43,29,.10); box-shadow: 0 12px 26px rgba(50,22,14,.08); }
+.my-klokr-score { width: 84px; height: 84px; display: grid; place-items: center; border-radius: 26px; background: var(--choco); color: var(--yellow); font-family: 'Russo One', Inter, sans-serif; font-size: 27px; }
+.my-klokr-body { min-width: 0; }
+.my-klokr-topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.my-klokr-topline strong { color: var(--choco); font-family: 'Russo One', Inter, sans-serif; font-size: 22px; }
+.my-klokr-topline span, .my-klokr-body p { color: rgba(50,22,14,.64); font-weight: 900; }
+.my-klokr-body p { margin: 4px 0 0; }
+.my-klokr-body blockquote { margin: 10px 0 0; padding: 11px 12px; border-left: 4px solid var(--red); border-radius: 14px; background: rgba(216,39,22,.07); color: var(--choco); font-weight: 900; }
+.my-klokr-details { margin-top: 10px; }
+.my-klokr-details summary { cursor: pointer; color: var(--red); font-weight: 1000; }
+.my-klokr-points { display: grid; gap: 8px; margin-top: 10px; }
+.my-klokr-point { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; padding: 10px; border-radius: 16px; background: rgba(255,255,255,.62); border: 1px solid rgba(90,43,29,.08); }
+.my-klokr-point strong { display: block; color: var(--choco); }
+.my-klokr-point span, .my-klokr-point em, .my-klokr-muted { display: block; color: rgba(50,22,14,.60); font-weight: 850; font-style: normal; }
+.my-klokr-point b { color: var(--green); font-family: 'Russo One', Inter, sans-serif; }
+@media (max-width: 760px) {
+  .my-klokr-panel { padding: 12px; }
+  .my-klokr-hero { display: grid; padding: 18px; }
+  .my-klokr-card { grid-template-columns: 1fr; }
+  .my-klokr-score { width: 100%; height: 70px; }
+  .my-klokr-topline { align-items: flex-start; flex-direction: column; }
+}
