@@ -52,19 +52,43 @@ function userNameFromRow(row) {
   return "Сотрудник";
 }
 
-async function supabaseFetch(path) {
+function supabaseConfig() {
   const config = window.APP_CONFIG || {};
-  const url = String(config.SUPABASE_URL || "").replace(/\/$/, "");
-  const key = config.SUPABASE_ANON_KEY || "";
-  if (!url || !key) throw new Error("Supabase config missing");
-  const response = await fetch(`${url}/rest/v1/${path}`, {
+  return {
+    url: String(config.SUPABASE_URL || "").replace(/\/$/, ""),
+    key: config.SUPABASE_ANON_KEY || "",
+  };
+}
+
+async function supabaseFetch(path) {
+  const config = supabaseConfig();
+  if (!config.url || !config.key) throw new Error("Supabase config missing");
+  const response = await fetch(`${config.url}/rest/v1/${path}`, {
     cache: "no-store",
     headers: {
-      "apikey": key,
-      "Authorization": `Bearer ${key}`,
+      "apikey": config.key,
+      "Authorization": `Bearer ${config.key}`,
     },
   });
   if (!response.ok) throw new Error(`Supabase request failed: ${path}`);
+  return response.json();
+}
+
+async function supabaseWrite(path, options = {}) {
+  const config = supabaseConfig();
+  if (!config.url || !config.key) throw new Error("Supabase config missing");
+  const response = await fetch(`${config.url}/rest/v1/${path}`, {
+    ...options,
+    cache: "no-store",
+    headers: {
+      "apikey": config.key,
+      "Authorization": `Bearer ${config.key}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) throw new Error(await response.text());
+  if (response.status === 204 || !response.headers.get("content-type")?.includes("application/json")) return null;
   return response.json();
 }
 
@@ -72,7 +96,7 @@ function normalizeData(data) {
   data.users = data.users || {};
   data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
   data.root_admin_ids = Array.from(new Set([...(data.root_admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
-  data.instructor_ids = Array.from(new Set([...(data.instructor_ids || []).map(String)]));
+  data.instructor_ids = Array.from(new Set([...(data.instructor_ids || []).map(String), ...data.admin_ids.map(String)]));
   data.klokr_top = data.klokr_top || [];
   data.top_month = Object.entries(data.users)
     .map(([id, item]) => ({ user_id: id, name: item.name || "Сотрудник", amount: Number(item.balance || 0) }))
@@ -115,6 +139,7 @@ async function loadSupabaseData() {
 
   const managerIds = managerRows.map(row => String(row.telegram_id));
   const instructorIds = (instructorRows || []).map(row => String(row.telegram_id));
+  const adminIds = [...ROOT_ADMIN_IDS, ...managerIds];
   const klokrTop = (klokrRows || []).map(row => ({
     id: row.id,
     user_id: String(row.employee_id),
@@ -131,8 +156,8 @@ async function loadSupabaseData() {
     users,
     managers: managerRows,
     instructors: instructorRows || [],
-    instructor_ids: instructorIds,
-    admin_ids: [...ROOT_ADMIN_IDS, ...managerIds],
+    instructor_ids: [...instructorIds, ...adminIds],
+    admin_ids: adminIds,
     root_admin_ids: ROOT_ADMIN_IDS,
     top_month: [],
     klokr_top: klokrTop,
@@ -316,6 +341,81 @@ function setupManagers(data) {
     }
     openBotDeepLink(`manager_remove_${select.value}`);
   };
+
+  setupInstructorRoles(data);
+}
+
+function setupInstructorRoles(data) {
+  if (!isRootAdmin(data)) return;
+  const panel = document.querySelector("#tab-managers .managers-panel");
+  if (!panel) return;
+  let root = document.getElementById("instructorRolesManager");
+  if (!root) {
+    panel.insertAdjacentHTML("beforeend", `
+      <div class="instructor-role-card" id="instructorRolesManager">
+        <div>
+          <p class="instructor-kicker">Роль</p>
+          <h3>Инструкторы</h3>
+          <p class="muted">Админы уже считаются инструкторами автоматически. Здесь выдаём роль обычным сотрудникам.</p>
+        </div>
+        <label>Сотрудник</label>
+        <select id="instructorUserSelect"></select>
+        <div class="admin-actions">
+          <button id="instructorAdd" class="action-btn add">+ Дать инструктора</button>
+          <button id="instructorRemove" class="action-btn remove">− Забрать</button>
+        </div>
+        <div id="instructorsList" class="instructor-list"></div>
+        <p id="instructorRoleStatus" class="admin-status"></p>
+      </div>
+    `);
+    root = document.getElementById("instructorRolesManager");
+  }
+
+  const instructorSelect = document.getElementById("instructorUserSelect");
+  preserveSelectValue(instructorSelect, Object.entries(data.users).map(([id, item]) => `<option value="${id}">${htmlEscape(item.name)} — ${id}</option>`).join(""));
+
+  const adminSet = new Set((data.admin_ids || []).map(String));
+  const explicitInstructorSet = new Set((data.instructors || []).map(row => String(row.telegram_id)));
+  const instructorsList = document.getElementById("instructorsList");
+  instructorsList.innerHTML = [
+    ...[...adminSet].map(id => ({ id, type: "админ" })),
+    ...[...explicitInstructorSet].filter(id => !adminSet.has(id)).map(id => ({ id, type: "инструктор" })),
+  ].map(item => {
+    const user = data.users[item.id] || { name: "Сотрудник" };
+    return `<div><strong>${htmlEscape(user.name)}</strong><span>${htmlEscape(item.type)} · ${htmlEscape(item.id)}</span></div>`;
+  }).join("") || `<p>Инструкторов пока нет.</p>`;
+
+  document.getElementById("instructorAdd").onclick = () => changeInstructorRole(true);
+  document.getElementById("instructorRemove").onclick = () => changeInstructorRole(false);
+}
+
+async function changeInstructorRole(add) {
+  const status = document.getElementById("instructorRoleStatus");
+  const target = document.getElementById("instructorUserSelect")?.value;
+  if (!target) {
+    if (status) status.textContent = "Выбери сотрудника.";
+    return;
+  }
+  try {
+    if (add) {
+      await supabaseWrite("instructors?on_conflict=telegram_id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ telegram_id: Number(target), created_by: userId ? Number(userId) : null, created_at: new Date().toISOString() }),
+      });
+      if (status) status.textContent = "Роль инструктора выдана.";
+    } else {
+      await supabaseWrite(`instructors?telegram_id=eq.${target}`, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
+      });
+      if (status) status.textContent = "Роль инструктора снята. Если это админ — доступ к КЛОКР всё равно останется.";
+    }
+    await renderApp();
+    if (typeof instructorLoad === "function") await instructorLoad();
+  } catch (error) {
+    if (status) status.textContent = "Не получилось обновить роль. Проверь SQL для таблицы instructors.";
+  }
 }
 
 async function renderApp() {
