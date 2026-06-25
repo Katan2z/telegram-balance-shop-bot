@@ -10,4 +10,3 @@
 .tab-more-menu .tab.active { background: var(--choco); color: var(--cream); }
 .tab-more-menu:empty::before { content: 'Пусто'; padding: 10px; color: rgba(50, 22, 14, .55); font-weight: 800; }
 @media (max-width: 760px) { .tabs { gap: 8px; padding: 8px; } .tabs > .tab, .tab-more-button { padding: 12px 14px; font-size: 13px; } .tab-more-wrap { margin-left: 0; } .tab-more-menu { right: -6px; min-width: 180px; } }
-@media (max-width: 420px) { .tabs > .tab[data-tab='rating'] { display: none; } .tab-more-menu .tab[data-tab='rating'] { display: inline-flex; } }
