@@ -50,18 +50,40 @@ function shopBuildSection() {
       <section class="tab-page" id="tab-shop">
         <article class="card shop-panel">
           <div class="shop-hero">
-            <div>
-              <p class="shop-kicker">Витрина наград</p>
-              <h2>🛍️ Магазин</h2>
-              <p class="muted">Меняй заслуженные монетки на приятные бонусы. Чек действует 6 часов.</p>
+            <div class="shop-hero-copy">
+              <p class="shop-kicker">BK Rewards</p>
+              <h2><span>Магазин</span> наград</h2>
+              <p class="muted">Забирай бонусы за монетки. Электронный чек действует 6 часов — просто покажи его менеджеру.</p>
+              <div class="shop-benefits" aria-label="Преимущества магазина">
+                <span>⚡ быстро</span>
+                <span>🎟️ чек в приложении</span>
+                <span>👑 для команды</span>
+              </div>
             </div>
-            <div class="shop-balance"><span>🪙</span><strong id="shopCoins">0</strong><small>монеток</small></div>
+            <div class="shop-balance-card">
+              <span>Твой баланс</span>
+              <strong id="shopCoins">0</strong>
+              <small>монеток</small>
+            </div>
+          </div>
+          <div class="shop-toolbar">
+            <div>
+              <p class="shop-toolbar-label">Витрина</p>
+              <h3>Выбери награду</h3>
+            </div>
+            <div id="shopSummary" class="shop-summary"></div>
           </div>
           <p id="shopStatus" class="shop-status"></p>
           <div id="shopGrid" class="shop-grid"></div>
           <div class="shop-receipts">
-            <h3>🎟️ Активные чеки</h3>
-            <div id="shopReceipts"></div>
+            <div class="shop-receipts-head">
+              <div>
+                <p class="shop-toolbar-label">После покупки</p>
+                <h3>Активные чеки</h3>
+              </div>
+              <span id="shopReceiptsCount" class="shop-count">0</span>
+            </div>
+            <div id="shopReceipts" class="shop-receipts-grid"></div>
           </div>
         </article>
       </section>
@@ -83,33 +105,66 @@ function shopPhoto(item) {
   return `<span>${shopEscape(item.emoji || "🎁")}</span>`;
 }
 
+function shopAffordText(price) {
+  const diff = price - shopState.coins;
+  if (diff <= 0) return "Можно забрать сейчас";
+  return `Ещё ${diff} 🪙 до награды`;
+}
+
 function shopRender() {
   shopBuildSection();
   const coins = document.getElementById("shopCoins");
+  const summary = document.getElementById("shopSummary");
   const grid = document.getElementById("shopGrid");
   const receipts = document.getElementById("shopReceipts");
+  const receiptsCount = document.getElementById("shopReceiptsCount");
   if (!grid || !receipts) return;
   if (coins) coins.textContent = shopState.coins;
 
-  grid.innerHTML = shopState.items.map(item => {
+  const affordableCount = shopState.items.filter(item => shopState.coins >= Number(item.price_coins || 0)).length;
+  if (summary) {
+    summary.innerHTML = `
+      <span>${shopState.items.length} наград</span>
+      <strong>${affordableCount} доступно</strong>
+    `;
+  }
+
+  grid.innerHTML = shopState.items.map((item, index) => {
     const price = Number(item.price_coins || 0);
     const canBuy = shopState.coins >= price;
+    const progress = price > 0 ? Math.min(100, Math.round((shopState.coins / price) * 100)) : 100;
     return `
-      <article class="shop-card reward-card">
-        <div class="shop-photo reward-photo">${shopPhoto(item)}</div>
+      <article class="shop-card reward-card ${index === 0 ? "shop-card-featured" : ""} ${canBuy ? "is-affordable" : "is-locked"}">
+        <div class="shop-photo reward-photo">
+          ${shopPhoto(item)}
+          <div class="shop-card-badge">${canBuy ? "Доступно" : "Копим"}</div>
+        </div>
         <div class="shop-body reward-body">
           <div class="reward-topline">
             <h3>${shopEscape(item.title)}</h3>
             <div class="shop-price">🪙 ${price}</div>
           </div>
           ${item.description ? `<p>${shopEscape(item.description)}</p>` : ""}
-          <button class="shop-buy" data-shop-buy="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "🎁 Получить" : "Не хватает монеток"}</button>
+          <div class="shop-progress" aria-label="Прогресс до покупки">
+            <span style="width:${progress}%"></span>
+          </div>
+          <div class="shop-card-meta">
+            <span>${shopAffordText(price)}</span>
+            <small>${progress}%</small>
+          </div>
+          <button class="shop-buy" data-shop-buy="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "Забрать награду" : "Не хватает монеток"}</button>
         </div>
       </article>
     `;
-  }).join("") || `<p class="shop-empty">Товары пока не добавлены.</p>`;
+  }).join("") || `
+    <div class="shop-empty shop-empty-card">
+      <strong>Витрина скоро откроется</strong>
+      <span>Награды пока не добавлены, но место уже выглядит дорого.</span>
+    </div>
+  `;
 
   const activeReceipts = shopState.receipts.filter(item => new Date(item.expires_at).getTime() > Date.now());
+  if (receiptsCount) receiptsCount.textContent = activeReceipts.length;
   receipts.innerHTML = activeReceipts.map(item => `
     <article class="shop-receipt reward-receipt">
       <div class="receipt-done">✓</div>
@@ -120,7 +175,12 @@ function shopRender() {
       <span>Стоимость: 🪙 ${Number(item.price_coins || 0)}</span>
       <em>Покажи этот чек менеджеру.</em>
     </article>
-  `).join("") || `<p class="shop-empty">Активных чеков пока нет.</p>`;
+  `).join("") || `
+    <div class="shop-empty shop-empty-card">
+      <strong>Чеков пока нет</strong>
+      <span>Заберёшь награду — здесь появится красивый код для менеджера.</span>
+    </div>
+  `;
 
   document.querySelectorAll("[data-shop-buy]").forEach(button => {
     button.onclick = () => shopBuy(Number(button.dataset.shopBuy));
