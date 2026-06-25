@@ -1,6 +1,7 @@
 const PRIMARY_TABS = new Set(["home", "shop"]);
 const QUICK_ACTIONS = [
   { tab: "rating", icon: "🏆", title: "Рейтинг", text: "Топ месяца" },
+  { tab: "my-klokr", icon: "📋", title: "Мои КЛОКР", text: "История проверок" },
   { tab: "storage", icon: "⏱️", title: "Сроки", text: "Калькулятор хранения" },
   { tab: "closing", icon: "✅", title: "Закрытие", text: "Чек-лист смены" },
   { tab: "instructor", icon: "🧑‍🏫", title: "Инструктор", text: "КЛОКР сотрудников" },
@@ -18,7 +19,7 @@ function navLabelFor(tabName) {
 function navSwitch(tabName) {
   if (typeof switchTab === "function") switchTab(tabName);
   document.querySelectorAll(".nav-action").forEach(button => {
-    button.classList.toggle("active", button.dataset.navAction === tabName);
+    button.classList.toggle("active", button.datasetNavAction === tabName || button.dataset.navAction === tabName);
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
