@@ -3,6 +3,7 @@ const QUICK_ACTIONS = [
   { tab: "rating", icon: "🏆", title: "Рейтинг", text: "Топ месяца" },
   { tab: "storage", icon: "⏱️", title: "Сроки", text: "Калькулятор хранения" },
   { tab: "closing", icon: "✅", title: "Закрытие", text: "Чек-лист смены" },
+  { tab: "instructor", icon: "🧑‍🏫", title: "Инструктор", text: "КЛОКР сотрудников" },
   { tab: "tasks", icon: "🧩", title: "Задачи", text: "Админские задачи" },
   { tab: "admin", icon: "👑", title: "Админка", text: "Спасибки и монетки" },
   { tab: "managers", icon: "🛡️", title: "Менеджеры", text: "Права доступа" },
