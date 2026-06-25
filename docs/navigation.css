@@ -1,0 +1,13 @@
+.tabs { position: relative; overflow: visible !important; align-items: center; }
+.tabs .tab { white-space: nowrap; }
+.tab-more-wrap { position: relative; margin-left: auto; }
+.tab-more-button { display: inline-flex; align-items: center; gap: 6px; }
+.tab-more-button::after { content: '⌄'; font-size: 13px; opacity: .72; transform: translateY(-1px); }
+.tab-more-wrap.open .tab-more-button::after { content: '⌃'; }
+.tab-more-menu { position: absolute; right: 0; top: calc(100% + 10px); z-index: 50; display: none; min-width: 190px; padding: 8px; border-radius: 24px; background: rgba(255, 252, 245, .96); border: 1px solid rgba(90, 43, 29, .14); box-shadow: 0 22px 44px rgba(50, 22, 14, .18); backdrop-filter: blur(16px); }
+.tab-more-wrap.open .tab-more-menu { display: grid; gap: 6px; }
+.tab-more-menu .tab { width: 100%; justify-content: flex-start; text-align: left; border-radius: 16px; padding: 12px 14px; background: transparent; box-shadow: none; }
+.tab-more-menu .tab.active { background: var(--choco); color: var(--cream); }
+.tab-more-menu:empty::before { content: 'Пусто'; padding: 10px; color: rgba(50, 22, 14, .55); font-weight: 800; }
+@media (max-width: 760px) { .tabs { gap: 8px; padding: 8px; } .tabs > .tab, .tab-more-button { padding: 12px 14px; font-size: 13px; } .tab-more-wrap { margin-left: 0; } .tab-more-menu { right: -6px; min-width: 180px; } }
+@media (max-width: 420px) { .tabs > .tab[data-tab='rating'] { display: none; } .tab-more-menu .tab[data-tab='rating'] { display: inline-flex; } }
