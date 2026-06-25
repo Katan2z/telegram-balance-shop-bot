@@ -14,6 +14,10 @@
 .instructor-form-card label, .instructor-role-card label { display: block; margin: 12px 0 6px; color: var(--choco-2); font-weight: 1000; }
 .instructor-form-card select, .instructor-form-card textarea, .instructor-role-card select { width: 100%; border: 1px solid rgba(90,43,29,.14); border-radius: 18px; padding: 13px 14px; background: #fffaf0; color: var(--choco); font: inherit; font-weight: 850; outline: none; }
 .instructor-form-card textarea { min-height: 92px; resize: vertical; }
+.klokr-position-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; padding: 8px; border-radius: 24px; background: #fff4d5; border: 1px solid rgba(90,43,29,.12); }
+.klokr-position-switch button { border: 0; border-radius: 18px; padding: 15px 12px; background: transparent; color: var(--choco-2); font: inherit; font-weight: 1000; cursor: pointer; transition: transform .16s ease, box-shadow .16s ease, background .16s ease; }
+.klokr-position-switch button.active { background: var(--choco); color: var(--cream); box-shadow: 0 10px 22px rgba(50,22,14,.18); transform: translateY(-1px); }
+.klokr-position-hint { margin: 8px 0 0; color: rgba(50,22,14,.62); font-weight: 900; }
 .klokr-items { display: grid; gap: 12px; margin-top: 14px; }
 .klokr-category { position: sticky; top: 82px; z-index: 2; margin-top: 8px; padding: 12px 14px; border-radius: 20px; background: linear-gradient(135deg, var(--choco), var(--choco-2)); color: var(--yellow); font-family: 'Russo One', Inter, sans-serif; text-transform: uppercase; letter-spacing: .8px; box-shadow: 0 12px 24px rgba(50,22,14,.18); }
 .klokr-item { padding: 14px; border-radius: 24px; background: linear-gradient(180deg, #fffaf0, #fff0d1); border: 1px solid rgba(90,43,29,.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,.65); }
@@ -51,6 +55,7 @@
   .instructor-hero { grid-template-columns: 1fr; padding: 18px; border-radius: 30px; }
   .instructor-score-card { min-height: 104px; }
   .klokr-category { top: 72px; }
+  .klokr-position-switch { grid-template-columns: 1fr; }
   .klokr-result-preview, .klokr-history-grid { grid-template-columns: 1fr; }
   .klokr-score-row { grid-template-columns: repeat(3, 1fr) !important; }
   .klokr-home-row { grid-template-columns: 48px 1fr; }
