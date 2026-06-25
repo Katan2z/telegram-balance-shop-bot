@@ -1,65 +1,82 @@
-const PRIMARY_TABS = new Set(["home", "rating", "shop"]);
-let navOrganizing = false;
+const PRIMARY_TABS = new Set(["home", "shop"]);
+const QUICK_ACTIONS = [
+  { tab: "rating", icon: "🏆", title: "Рейтинг", text: "Топ месяца" },
+  { tab: "storage", icon: "⏱️", title: "Сроки", text: "Калькулятор хранения" },
+  { tab: "closing", icon: "✅", title: "Закрытие", text: "Чек-лист смены" },
+  { tab: "tasks", icon: "🧩", title: "Задачи", text: "Админские задачи" },
+  { tab: "admin", icon: "👑", title: "Админка", text: "Спасибки и монетки" },
+  { tab: "managers", icon: "🛡️", title: "Менеджеры", text: "Права доступа" },
+];
 
-function setupCompactNavigation() {
+function navLabelFor(tabName) {
+  if (tabName === "home") return "Главная";
+  if (tabName === "shop") return "Магазин";
+  return tabName;
+}
+
+function navSwitch(tabName) {
+  if (typeof switchTab === "function") switchTab(tabName);
+  document.querySelectorAll(".nav-action").forEach(button => {
+    button.classList.toggle("active", button.dataset.navAction === tabName);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function setupSimpleNavigation() {
   const tabs = document.getElementById("tabs");
-  if (!tabs || navOrganizing) return;
-  navOrganizing = true;
+  if (!tabs) return;
 
-  let wrap = document.getElementById("tabMoreWrap");
-  if (!wrap) {
-    wrap = document.createElement("div");
-    wrap.id = "tabMoreWrap";
-    wrap.className = "tab-more-wrap";
-    wrap.innerHTML = `
-      <button class="tab tab-more-button" type="button">Ещё</button>
-      <div class="tab-more-menu" id="tabMoreMenu"></div>
-    `;
-    tabs.appendChild(wrap);
-    wrap.querySelector(".tab-more-button").addEventListener("click", event => {
-      event.stopPropagation();
-      wrap.classList.toggle("open");
-    });
-  }
-
-  const menu = document.getElementById("tabMoreMenu");
-  const buttons = Array.from(tabs.querySelectorAll(".tab[data-tab]")).filter(button => !button.classList.contains("tab-more-button"));
-
+  const buttons = Array.from(tabs.querySelectorAll(".tab[data-tab]")).filter(button => !button.classList.contains("nav-hidden-tab"));
   for (const button of buttons) {
     const tabName = button.dataset.tab;
+    button.textContent = navLabelFor(tabName);
     if (PRIMARY_TABS.has(tabName)) {
-      if (button.parentElement === menu) tabs.insertBefore(button, wrap);
+      button.classList.remove("nav-hidden-tab");
+      button.style.display = "";
     } else {
-      if (button.parentElement !== menu) menu.appendChild(button);
+      button.classList.add("nav-hidden-tab");
+      button.style.display = "none";
     }
   }
 
-  const hasActiveInside = Boolean(menu.querySelector(".tab.active"));
-  wrap.querySelector(".tab-more-button")?.classList.toggle("active", hasActiveInside);
-  navOrganizing = false;
+  const home = document.getElementById("tab-home");
+  if (!home || document.getElementById("quickActionsCard")) return;
+
+  const available = QUICK_ACTIONS.filter(action => document.getElementById(`tab-${action.tab}`));
+  if (!available.length) return;
+
+  home.insertAdjacentHTML("beforeend", `
+    <article class="card quick-actions-card" id="quickActionsCard">
+      <div class="quick-actions-head">
+        <h2>⚡ Быстрые действия</h2>
+        <p class="muted">Всё рабочее — тут, без шума наверху.</p>
+      </div>
+      <div class="quick-actions-grid">
+        ${available.map(action => `
+          <button class="nav-action" type="button" data-nav-action="${action.tab}">
+            <span>${action.icon}</span>
+            <strong>${action.title}</strong>
+            <small>${action.text}</small>
+          </button>
+        `).join("")}
+      </div>
+    </article>
+  `);
+
+  document.querySelectorAll("[data-nav-action]").forEach(button => {
+    button.onclick = () => navSwitch(button.dataset.navAction);
+  });
 }
 
-document.addEventListener("click", event => {
-  const wrap = document.getElementById("tabMoreWrap");
-  if (wrap && !wrap.contains(event.target)) wrap.classList.remove("open");
-});
-
-document.addEventListener("click", event => {
-  if (event.target.closest("#tabMoreMenu .tab")) {
-    document.getElementById("tabMoreWrap")?.classList.remove("open");
-    setTimeout(setupCompactNavigation, 0);
-  }
-});
-
-const navObserver = new MutationObserver(() => setTimeout(setupCompactNavigation, 0));
+const navObserver = new MutationObserver(() => setTimeout(setupSimpleNavigation, 0));
 const navStart = () => {
   const tabs = document.getElementById("tabs");
   if (!tabs) return;
-  setupCompactNavigation();
+  setupSimpleNavigation();
   navObserver.observe(tabs, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
 };
 
 document.addEventListener("DOMContentLoaded", navStart);
 setTimeout(navStart, 300);
-setTimeout(setupCompactNavigation, 1200);
-setInterval(setupCompactNavigation, 3000);
+setTimeout(setupSimpleNavigation, 1200);
+setInterval(setupSimpleNavigation, 2500);
