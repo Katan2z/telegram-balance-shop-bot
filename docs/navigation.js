@@ -23,6 +23,22 @@ function navSwitch(tabName) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function navActionMarkup(action) {
+  return `
+    <button class="nav-action" type="button" data-nav-action="${action.tab}">
+      <span>${action.icon}</span>
+      <strong>${action.title}</strong>
+      <small>${action.text}</small>
+    </button>
+  `;
+}
+
+function navBindActions() {
+  document.querySelectorAll("[data-nav-action]").forEach(button => {
+    button.onclick = () => navSwitch(button.dataset.navAction);
+  });
+}
+
 function setupSimpleNavigation() {
   const tabs = document.getElementById("tabs");
   if (!tabs) return;
@@ -41,28 +57,28 @@ function setupSimpleNavigation() {
   }
 
   const home = document.getElementById("tab-home");
-  if (!home || document.getElementById("quickActionsCard")) return;
+  if (!home) return;
 
   const available = QUICK_ACTIONS.filter(action => document.getElementById(`tab-${action.tab}`));
   if (!available.length) return;
 
-  home.insertAdjacentHTML("beforeend", `
-    <article class="quick-actions-card" id="quickActionsCard">
-      <div class="quick-actions-grid">
-        ${available.map(action => `
-          <button class="nav-action" type="button" data-nav-action="${action.tab}">
-            <span>${action.icon}</span>
-            <strong>${action.title}</strong>
-            <small>${action.text}</small>
-          </button>
-        `).join("")}
-      </div>
-    </article>
-  `);
+  let card = document.getElementById("quickActionsCard");
+  if (!card) {
+    home.insertAdjacentHTML("beforeend", `
+      <article class="quick-actions-card" id="quickActionsCard">
+        <div class="quick-actions-grid"></div>
+      </article>
+    `);
+    card = document.getElementById("quickActionsCard");
+  }
 
-  document.querySelectorAll("[data-nav-action]").forEach(button => {
-    button.onclick = () => navSwitch(button.dataset.navAction);
-  });
+  const grid = card.querySelector(".quick-actions-grid");
+  if (!grid) return;
+  const existing = new Set([...grid.querySelectorAll("[data-nav-action]")].map(button => button.dataset.navAction));
+  for (const action of available) {
+    if (!existing.has(action.tab)) grid.insertAdjacentHTML("beforeend", navActionMarkup(action));
+  }
+  navBindActions();
 }
 
 const navObserver = new MutationObserver(() => setTimeout(setupSimpleNavigation, 0));
