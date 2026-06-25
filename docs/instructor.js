@@ -8,12 +8,40 @@ function instructorEscape(value) {
 }
 
 const KLOKR_ITEMS = [
-  { id: "standards", title: "Стандарты Burger King", text: "Знает ключевые стандарты сервиса, чистоты и внешнего вида." },
-  { id: "safety", title: "Безопасность и санитария", text: "Соблюдает правила безопасности, перчатки, маркировку и чистоту станции." },
-  { id: "products", title: "Продуктовые знания", text: "Понимает составы, сроки хранения и требования к качеству продукта." },
-  { id: "station", title: "Работа на станции", text: "Уверенно выполняет операции на рабочем месте без лишних подсказок." },
-  { id: "guest", title: "Гостевой опыт", text: "Общается спокойно, вежливо и помогает держать скорость обслуживания." },
-  { id: "team", title: "Командность", text: "Слышит менеджера, помогает команде и корректно принимает обратную связь." },
+  { id: "k_uniform", category: "Кухня · практика", title: "Стандарты внешнего вида и униформы соответствуют", text: "Грязная униформа/фартук −1, порванная обувь −1, пирсинг/серьги/накладные ресницы/ногти −2, нет бейджика −1, головной убор неправильный или отсутствует −1, нет фартука −1.", max: 2 },
+  { id: "k_hands", category: "Кухня · практика", title: "Правила мытья рук", text: "Нет отметки / не помыл раз в час −2, не помыл после аллергенов −2, не помыл после касания себя/пола/мусорки −1 за каждый случай.", max: 2 },
+  { id: "k_gloves", category: "Кухня · практика", title: "Перчатки используются согласно стандартам", text: "Нет: −2.", max: 2 },
+  { id: "k_transition_hands", category: "Кухня · практика", title: "Мытьё рук при переходе с позиции на позицию", text: "Нарушены правила: −2.", max: 2 },
+  { id: "k_sandwich_sequence", category: "Кухня · практика", title: "Сандвичи готовятся в верной последовательности", text: "Нет: −1 за каждый случай.", max: 4 },
+  { id: "k_grams", category: "Кухня · практика", title: "Граммовки соблюдаются", text: "Нет: −1 за каждый случай.", max: 3 },
+  { id: "k_proteins_tongs", category: "Кухня · практика", title: "Протеины накладываются с использованием щипцов", text: "Нет: −1 за каждый случай.", max: 2 },
+  { id: "k_timers_position", category: "Кухня · практика", title: "Таймеры на позиции актуальные", text: "Включая дезу. Нет: −2.", max: 2 },
+  { id: "k_prep_tempering", category: "Кухня · практика", title: "Овощи и продукты заготавливаются и темперируются своевременно", text: "Таймеры не просрочены. Нет: −1 за каждый случай.", max: 1 },
+  { id: "k_product_standard", category: "Кухня · практика", title: "Продукты соответствуют стандартам", text: "Заветрено, порвано и т.п.: −1.", max: 1 },
+  { id: "k_product_timers", category: "Кухня · практика", title: "Таймеры на продукцию выставляются верно", text: "Нет: −1 за каждый случай.", max: 2 },
+  { id: "k_phu_quantity_timers", category: "Кухня · практика", title: "Количество и электронные таймеры в PHU соответствуют стандартам", text: "Нет: −1 за каждый случай.", max: 2 },
+  { id: "k_fryer_transport", category: "Кухня · практика", title: "ГП на фритюре транспортируется согласно стандартам", text: "Нет: −1.", max: 1 },
+  { id: "k_clean_position", category: "Кухня · практика", title: "Позиция содержится в чистоте", text: "Нет: −2.", max: 2 },
+
+  { id: "s_uniform", category: "Прилавок · практика", title: "Стандарты внешнего вида и униформы соответствуют", text: "Грязная униформа/фартук −1, порванная обувь −1, пирсинг/серьги/накладные ресницы/ногти −2, нет бейджика −1, головной убор неправильный или отсутствует −1, нет фартука −1.", max: 2 },
+  { id: "s_hands", category: "Прилавок · практика", title: "Правила мытья рук", text: "Нет отметки / не помыл раз в час −2, не помыл после аллергенов −2, не помыл после касания себя/пола/мусорки −1 за каждый случай.", max: 2 },
+  { id: "s_gloves", category: "Прилавок · практика", title: "Перчатки используются согласно стандартам", text: "Нет: −2.", max: 2 },
+  { id: "s_transition_hands", category: "Прилавок · практика", title: "Мытьё рук при переходе с позиции на позицию", text: "Нарушены правила: −2.", max: 2 },
+  { id: "s_cash_order", category: "Прилавок · практика", title: "Заказ на кассе принимается со всеми подсказками", text: "Приветствие −1, допы −1, перевод на комбо −1, треугольник продаж −1.", max: 4 },
+  { id: "s_timers_position", category: "Прилавок · практика", title: "Таймеры на позиции актуальные", text: "Включая дезу. Нет: −2.", max: 2 },
+  { id: "s_order_accuracy", category: "Прилавок · практика", title: "Заказы собираются точно", text: "Нет: −1 за каждый случай.", max: 3 },
+  { id: "s_here_takeaway", category: "Прилавок · практика", title: "Заказы на месте и с собой собираются верно", text: "Нет: −1 за каждый случай.", max: 1 },
+  { id: "s_clean_position", category: "Прилавок · практика", title: "Позиция содержится в чистоте", text: "Нет: −2.", max: 2 },
+  { id: "s_friendly", category: "Прилавок · практика", title: "Сотрудник дружелюбен", text: "Желает приятного аппетита и хорошего дня. Нет: −2.", max: 2 },
+  { id: "s_guest_reaction", category: "Прилавок · практика", title: "Реакция на гостя до 5 секунд", text: "Нет: −1.", max: 1 },
+
+  { id: "t_wash_hands", category: "Теория", title: "Как правильно мыть руки?", text: "Нет: −2.", max: 2 },
+  { id: "t_phu_quantity", category: "Теория", title: "Количество в PHU: 3 вида продукции", text: "Нет: −2.", max: 2 },
+  { id: "t_allergen", category: "Теория", title: "Для чего какая аллергенная посуда", text: "Нет: −1.", max: 1 },
+  { id: "t_greeting_sales", category: "Теория", title: "Как приветствовать гостя, треугольник продаж, допы", text: "Нет: −1 за каждый случай.", max: 3 },
+  { id: "t_new_items", category: "Теория", title: "3 вопроса по новинкам", text: "Нет: −1 за каждый случай.", max: 3 },
+  { id: "t_bonus", category: "Теория", title: "За что мы получаем премию", text: "Нет: −1.", max: 1 },
+  { id: "t_motivation", category: "Теория", title: "Какие есть виды мотивации", text: "Пункт из таблицы без баллов — можно оставить комментарий.", max: 0 },
 ];
 
 let instructorState = {
@@ -24,6 +52,10 @@ let instructorState = {
   rootIds: new Set(),
   adminIds: new Set(),
 };
+
+function instructorMaxScore() {
+  return KLOKR_ITEMS.reduce((sum, item) => sum + Number(item.max || 0), 0);
+}
 
 function instructorFetch(path, options = {}) {
   const config = window.APP_CONFIG || {};
@@ -76,11 +108,11 @@ function instructorBuildSection() {
             <div>
               <p class="instructor-kicker">Обучение команды</p>
               <h2>🧑‍🏫 КЛОКР</h2>
-              <p>Проверка знаний сотрудников: оценка по пунктам, комментарии инструктора и общий результат.</p>
+              <p>Проверка знаний сотрудников по листу: кухня, прилавок и теория. Каждый пункт можно оценить и прокомментировать.</p>
             </div>
             <div class="instructor-score-card">
               <span>Максимум</span>
-              <strong>${KLOKR_ITEMS.length * 2}</strong>
+              <strong>${instructorMaxScore()}</strong>
               <small>баллов</small>
             </div>
           </div>
@@ -148,34 +180,51 @@ function instructorRenderEmployeeSelect() {
   if (previous && [...select.options].some(option => option.value === previous)) select.value = previous;
 }
 
+function instructorScoreInputs(item) {
+  const max = Number(item.max || 0);
+  if (max <= 0) return `<div class="klokr-score-row no-score"><span>Без баллов</span></div>`;
+  return `
+    <div class="klokr-score-row" style="grid-template-columns: repeat(${max + 1}, 1fr)">
+      ${Array.from({ length: max + 1 }, (_, score) => `
+        <label><input type="radio" name="score_${item.id}" value="${score}" ${score === max ? "checked" : ""}> ${score}</label>
+      `).join("")}
+    </div>
+  `;
+}
+
 function instructorRenderItems() {
   const root = document.getElementById("klokrItems");
   if (!root) return;
-  root.innerHTML = KLOKR_ITEMS.map((item, index) => `
-    <article class="klokr-item" data-klokr-item="${instructorEscape(item.id)}">
-      <div class="klokr-item-head">
-        <div class="klokr-number">${index + 1}</div>
-        <div>
-          <strong>${instructorEscape(item.title)}</strong>
-          <span>${instructorEscape(item.text)}</span>
+  let lastCategory = "";
+  root.innerHTML = KLOKR_ITEMS.map((item, index) => {
+    const category = item.category || "КЛОКР";
+    const categoryHtml = category !== lastCategory ? `<div class="klokr-category">${instructorEscape(category)}</div>` : "";
+    lastCategory = category;
+    return `
+      ${categoryHtml}
+      <article class="klokr-item" data-klokr-item="${instructorEscape(item.id)}">
+        <div class="klokr-item-head">
+          <div class="klokr-number">${index + 1}</div>
+          <div>
+            <strong>${instructorEscape(item.title)}</strong>
+            <span>${instructorEscape(item.text)}</span>
+            <small>Максимум: ${Number(item.max || 0)} баллов</small>
+          </div>
         </div>
-      </div>
-      <div class="klokr-score-row">
-        <label><input type="radio" name="score_${item.id}" value="0"> 0</label>
-        <label><input type="radio" name="score_${item.id}" value="1"> 1</label>
-        <label><input type="radio" name="score_${item.id}" value="2" checked> 2</label>
-      </div>
-      <textarea data-klokr-comment="${instructorEscape(item.id)}" placeholder="Комментарий по пункту"></textarea>
-    </article>
-  `).join("");
+        ${instructorScoreInputs(item)}
+        <textarea data-klokr-comment="${instructorEscape(item.id)}" placeholder="Комментарий по пункту"></textarea>
+      </article>
+    `;
+  }).join("");
   root.querySelectorAll("input, textarea").forEach(input => input.addEventListener("input", instructorUpdatePreview));
 }
 
 function instructorCollectAssessment() {
   const items = KLOKR_ITEMS.map(item => {
-    const score = Number(document.querySelector(`input[name="score_${item.id}"]:checked`)?.value || 0);
+    const max = Number(item.max || 0);
+    const score = max > 0 ? Number(document.querySelector(`input[name="score_${item.id}"]:checked`)?.value || 0) : 0;
     const comment = document.querySelector(`[data-klokr-comment="${item.id}"]`)?.value.trim() || "";
-    return { id: item.id, title: item.title, score, max: 2, comment };
+    return { id: item.id, category: item.category || "", title: item.title, score, max, comment };
   });
   const total = items.reduce((sum, item) => sum + Number(item.score || 0), 0);
   const max = items.reduce((sum, item) => sum + Number(item.max || 0), 0);
@@ -250,7 +299,7 @@ function instructorRenderHistory() {
         <div class="klokr-percent">${Number(item.percent || 0)}%</div>
         <div>
           <strong>${instructorEscape(employee)}</strong>
-          <span>${Number(item.total_score || 0)}/${Number(item.max_score || KLOKR_ITEMS.length * 2)} баллов · ${instructorEscape(instructorFormatDate(item.created_at))}</span>
+          <span>${Number(item.total_score || 0)}/${Number(item.max_score || instructorMaxScore())} баллов · ${instructorEscape(instructorFormatDate(item.created_at))}</span>
           <small>Инструктор: ${instructorEscape(instructor)}</small>
         </div>
       </article>
