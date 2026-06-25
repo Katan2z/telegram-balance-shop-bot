@@ -18,9 +18,11 @@ const KLOKR_ITEMS = [
 
 let instructorState = {
   users: {},
+  managers: [],
   instructors: [],
   assessments: [],
   rootIds: new Set(),
+  adminIds: new Set(),
 };
 
 function instructorFetch(path, options = {}) {
@@ -48,14 +50,11 @@ function instructorName(id) {
   return instructorState.users[String(id)]?.name || "Сотрудник";
 }
 
-function instructorIsRoot() {
-  return Boolean(userId && instructorState.rootIds.has(String(userId)));
-}
-
 function instructorIsAllowed() {
   if (!userId) return false;
-  if (instructorIsRoot()) return true;
-  return instructorState.instructors.some(row => String(row.telegram_id) === String(userId));
+  const id = String(userId);
+  if (instructorState.adminIds.has(id)) return true;
+  return instructorState.instructors.some(row => String(row.telegram_id) === id);
 }
 
 function instructorBuildSection() {
@@ -85,8 +84,6 @@ function instructorBuildSection() {
               <small>баллов</small>
             </div>
           </div>
-
-          <div id="instructorManage" class="instructor-manage"></div>
 
           <div class="instructor-form-card">
             <div class="instructor-title-row">
@@ -124,8 +121,9 @@ function instructorBuildSection() {
 async function instructorLoadBase() {
   const rootIds = typeof ROOT_ADMIN_IDS !== "undefined" ? ROOT_ADMIN_IDS.map(String) : [];
   instructorState.rootIds = new Set(rootIds);
-  const [usersRows, instructorRows] = await Promise.all([
+  const [usersRows, managerRows, instructorRows] = await Promise.all([
     instructorFetch("users?select=telegram_id,username,first_name,last_name,balance&order=first_name.asc"),
+    instructorFetch("managers?select=telegram_id").catch(() => []),
     instructorFetch("instructors?select=telegram_id,created_by,created_at&order=created_at.desc").catch(() => []),
   ]);
   const users = {};
@@ -133,40 +131,11 @@ async function instructorLoadBase() {
     const id = String(row.telegram_id);
     users[id] = { name: userNameFromRow(row), balance: Number(row.balance || 0) };
   }
+  const managerIds = (managerRows || []).map(row => String(row.telegram_id));
   instructorState.users = users;
+  instructorState.managers = managerRows || [];
   instructorState.instructors = instructorRows || [];
-}
-
-function instructorRenderManage() {
-  const root = document.getElementById("instructorManage");
-  if (!root) return;
-  if (!instructorIsRoot()) {
-    root.innerHTML = "";
-    return;
-  }
-  const instructorSet = new Set(instructorState.instructors.map(row => String(row.telegram_id)));
-  const options = Object.entries(instructorState.users)
-    .map(([id, item]) => `<option value="${instructorEscape(id)}">${instructorEscape(item.name)} — ${instructorEscape(id)}</option>`)
-    .join("");
-  root.innerHTML = `
-    <div class="instructor-role-card">
-      <div>
-        <p class="instructor-kicker">Роль</p>
-        <h3>Инструкторы</h3>
-      </div>
-      <select id="instructorUserSelect">${options}</select>
-      <div class="admin-actions">
-        <button id="instructorAdd" class="action-btn add">+ Дать роль</button>
-        <button id="instructorRemove" class="action-btn remove">− Забрать</button>
-      </div>
-      <div class="instructor-list">
-        ${[...instructorSet].map(id => `<div><strong>${instructorEscape(instructorName(id))}</strong><span>${instructorEscape(id)}</span></div>`).join("") || `<p>Инструкторов пока нет.</p>`}
-      </div>
-      <p id="instructorRoleStatus" class="admin-status"></p>
-    </div>
-  `;
-  document.getElementById("instructorAdd").onclick = () => instructorSetRole(true);
-  document.getElementById("instructorRemove").onclick = () => instructorSetRole(false);
+  instructorState.adminIds = new Set([...rootIds, ...managerIds]);
 }
 
 function instructorRenderEmployeeSelect() {
@@ -223,33 +192,6 @@ function instructorUpdatePreview() {
     <div><span>Процент</span><strong>${result.percent}%</strong></div>
     <div><span>Статус</span><strong>${result.percent >= 85 ? "Отлично" : result.percent >= 65 ? "Норм" : "Нужна тренировка"}</strong></div>
   `;
-}
-
-async function instructorSetRole(add) {
-  const status = document.getElementById("instructorRoleStatus");
-  const select = document.getElementById("instructorUserSelect");
-  const target = select?.value;
-  if (!target) {
-    if (status) status.textContent = "Выбери сотрудника.";
-    return;
-  }
-  try {
-    if (add) {
-      await instructorFetch("instructors?on_conflict=telegram_id", {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({ telegram_id: Number(target), created_by: userId ? Number(userId) : null, created_at: new Date().toISOString() }),
-      });
-      if (status) status.textContent = "Инструктор добавлен.";
-    } else {
-      await instructorFetch(`instructors?telegram_id=eq.${target}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-      if (status) status.textContent = "Роль инструктора снята.";
-    }
-    await instructorLoad();
-    if (typeof renderApp === "function") await renderApp();
-  } catch (error) {
-    if (status) status.textContent = "Не получилось обновить роль. Проверь SQL для instructors.";
-  }
 }
 
 async function instructorSaveAssessment() {
@@ -320,7 +262,6 @@ async function instructorLoad() {
   await instructorLoadBase();
   if (!instructorIsAllowed()) return;
   instructorBuildSection();
-  instructorRenderManage();
   instructorRenderEmployeeSelect();
   instructorRenderItems();
   instructorUpdatePreview();
