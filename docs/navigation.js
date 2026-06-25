@@ -46,10 +46,7 @@ function setupSimpleNavigation() {
   if (!available.length) return;
 
   home.insertAdjacentHTML("beforeend", `
-    <article class="card quick-actions-card" id="quickActionsCard">
-      <div class="quick-actions-head">
-        <h2>⚡ Быстрые действия</h2>
-      </div>
+    <article class="quick-actions-card" id="quickActionsCard">
       <div class="quick-actions-grid">
         ${available.map(action => `
           <button class="nav-action" type="button" data-nav-action="${action.tab}">
