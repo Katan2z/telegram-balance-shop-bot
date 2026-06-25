@@ -49,17 +49,18 @@ function shopBuildSection() {
     app.insertAdjacentHTML("beforeend", `
       <section class="tab-page" id="tab-shop">
         <article class="card shop-panel">
-          <div class="shop-head">
+          <div class="shop-hero">
             <div>
+              <p class="shop-kicker">Витрина наград</p>
               <h2>🛍️ Магазин</h2>
-              <p class="muted">Покупай за монетки. Чек действует 6 часов.</p>
+              <p class="muted">Меняй заслуженные монетки на приятные бонусы. Чек действует 6 часов.</p>
             </div>
-            <div class="shop-balance"><span>🪙 Монетки</span><strong id="shopCoins">0</strong></div>
+            <div class="shop-balance"><span>🪙</span><strong id="shopCoins">0</strong><small>монеток</small></div>
           </div>
           <p id="shopStatus" class="shop-status"></p>
           <div id="shopGrid" class="shop-grid"></div>
           <div class="shop-receipts">
-            <h3>🎟️ Мои активные чеки</h3>
+            <h3>🎟️ Активные чеки</h3>
             <div id="shopReceipts"></div>
           </div>
         </article>
@@ -79,7 +80,7 @@ function shopFormatTime(value) {
 
 function shopPhoto(item) {
   if (item.image_url) return `<img src="${shopEscape(item.image_url)}" alt="${shopEscape(item.title)}" loading="lazy" />`;
-  return item.emoji || "🎁";
+  return `<span>${shopEscape(item.emoji || "🎁")}</span>`;
 }
 
 function shopRender() {
@@ -94,13 +95,15 @@ function shopRender() {
     const price = Number(item.price_coins || 0);
     const canBuy = shopState.coins >= price;
     return `
-      <article class="shop-card">
-        <div class="shop-photo">${shopPhoto(item)}</div>
-        <div class="shop-body">
-          <h3>${shopEscape(item.title)}</h3>
+      <article class="shop-card reward-card">
+        <div class="shop-photo reward-photo">${shopPhoto(item)}</div>
+        <div class="shop-body reward-body">
+          <div class="reward-topline">
+            <h3>${shopEscape(item.title)}</h3>
+            <div class="shop-price">🪙 ${price}</div>
+          </div>
           ${item.description ? `<p>${shopEscape(item.description)}</p>` : ""}
-          <div class="shop-price">🪙 ${price}</div>
-          <button class="shop-buy" data-shop-buy="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "Купить" : "Не хватает монеток"}</button>
+          <button class="shop-buy" data-shop-buy="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "🎁 Получить" : "Не хватает монеток"}</button>
         </div>
       </article>
     `;
@@ -108,11 +111,14 @@ function shopRender() {
 
   const activeReceipts = shopState.receipts.filter(item => new Date(item.expires_at).getTime() > Date.now());
   receipts.innerHTML = activeReceipts.map(item => `
-    <article class="shop-receipt">
+    <article class="shop-receipt reward-receipt">
+      <div class="receipt-done">✓</div>
+      <small>Чек на награду</small>
       <strong>${shopEscape(item.item_title)}</strong>
       <div class="shop-code">${shopEscape(item.receipt_code)}</div>
       <span>Действителен до ${shopEscape(shopFormatTime(item.expires_at))}</span>
-      <span>Стоимость: ${Number(item.price_coins || 0)} монеток</span>
+      <span>Стоимость: 🪙 ${Number(item.price_coins || 0)}</span>
+      <em>Покажи этот чек менеджеру.</em>
     </article>
   `).join("") || `<p class="shop-empty">Активных чеков пока нет.</p>`;
 
@@ -138,16 +144,16 @@ async function shopLoad() {
 async function shopBuy(itemId) {
   const status = document.getElementById("shopStatus");
   try {
-    if (status) status.textContent = "Покупаем...";
+    if (status) status.textContent = "Оформляем награду...";
     const result = await shopFetch("rpc/purchase_shop_item", {
       method: "POST",
       body: JSON.stringify({ p_user_id: Number(userId), p_item_id: Number(itemId) }),
     });
-    if (status) status.textContent = `Покупка готова. Чек: ${result?.receipt_code || "создан"}`;
+    if (status) status.textContent = `🎉 Награда оформлена. Чек: ${result?.receipt_code || "создан"}`;
     await shopLoad();
     if (typeof renderApp === "function") await renderApp();
   } catch (error) {
-    if (status) status.textContent = "Не получилось купить. Возможно, не хватает монеток или не выполнен SQL магазина.";
+    if (status) status.textContent = "Не получилось оформить. Возможно, не хватает монеток.";
   }
 }
 
