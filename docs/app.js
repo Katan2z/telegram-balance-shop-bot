@@ -72,6 +72,8 @@ function normalizeData(data) {
   data.users = data.users || {};
   data.admin_ids = Array.from(new Set([...(data.admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
   data.root_admin_ids = Array.from(new Set([...(data.root_admin_ids || []).map(String), ...ROOT_ADMIN_IDS]));
+  data.instructor_ids = Array.from(new Set([...(data.instructor_ids || []).map(String)]));
+  data.klokr_top = data.klokr_top || [];
   data.top_month = Object.entries(data.users)
     .map(([id, item]) => ({ user_id: id, name: item.name || "Сотрудник", amount: Number(item.balance || 0) }))
     .filter(item => item.amount > 0)
@@ -90,9 +92,11 @@ function preserveSelectValue(select, html) {
 }
 
 async function loadSupabaseData() {
-  const [usersRows, managerRows] = await Promise.all([
+  const [usersRows, managerRows, instructorRows, klokrRows] = await Promise.all([
     supabaseFetch("users?select=telegram_id,username,first_name,last_name,balance,coins,updated_at&order=balance.desc"),
     supabaseFetch("managers?select=telegram_id,created_by,created_at"),
+    supabaseFetch("instructors?select=telegram_id,created_by,created_at").catch(() => []),
+    supabaseFetch("klokr_assessments?select=id,employee_id,instructor_id,total_score,max_score,percent,created_at&order=percent.desc,created_at.desc&limit=3").catch(() => []),
   ]);
 
   const users = {};
@@ -110,12 +114,28 @@ async function loadSupabaseData() {
   }
 
   const managerIds = managerRows.map(row => String(row.telegram_id));
+  const instructorIds = (instructorRows || []).map(row => String(row.telegram_id));
+  const klokrTop = (klokrRows || []).map(row => ({
+    id: row.id,
+    user_id: String(row.employee_id),
+    instructor_id: row.instructor_id ? String(row.instructor_id) : null,
+    name: users[String(row.employee_id)]?.name || "Сотрудник",
+    instructor_name: users[String(row.instructor_id)]?.name || "Инструктор",
+    total_score: Number(row.total_score || 0),
+    max_score: Number(row.max_score || 0),
+    percent: Number(row.percent || 0),
+    created_at: row.created_at,
+  }));
+
   return normalizeData({
     users,
     managers: managerRows,
+    instructors: instructorRows || [],
+    instructor_ids: instructorIds,
     admin_ids: [...ROOT_ADMIN_IDS, ...managerIds],
     root_admin_ids: ROOT_ADMIN_IDS,
     top_month: [],
+    klokr_top: klokrTop,
   });
 }
 
@@ -172,6 +192,25 @@ function renderHero(items) {
       <div class="progress"><i style="width:${Math.min(100, Math.max(8, amount))}%"></i></div>
     </div>
   `;
+}
+
+function renderKlokrTop(items) {
+  const root = document.getElementById("klokrTopHome");
+  if (!root) return;
+  if (!items || items.length === 0) {
+    root.innerHTML = `<p>Пока нет проверок. Лучшие результаты КЛОКР появятся здесь после первой оценки.</p>`;
+    return;
+  }
+  root.innerHTML = items.slice(0, 3).map((item, index) => `
+    <div class="klokr-home-row">
+      <div class="klokr-home-medal">${medal[index] || "🏅"}</div>
+      <div>
+        <strong>${htmlEscape(item.name || "Сотрудник")}</strong>
+        <span>${Number(item.total_score || 0)}/${Number(item.max_score || 0)} баллов · ${htmlEscape(item.instructor_name || "Инструктор")}</span>
+      </div>
+      <div class="klokr-home-percent">${Number(item.percent || 0)}%</div>
+    </div>
+  `).join("");
 }
 
 function renderMyStats(data) {
@@ -285,6 +324,7 @@ async function renderApp() {
     renderMyStats(data);
     renderTop(data.top_month);
     renderHero(data.top_month);
+    renderKlokrTop(data.klokr_top);
     setupAdmin(data);
   } catch (error) {
     setText("userName", "Не удалось загрузить данные");
