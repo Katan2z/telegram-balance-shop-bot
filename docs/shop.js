@@ -34,6 +34,7 @@ async function shopFetch(path, options = {}) {
 }
 
 let shopState = { items: [], receipts: [], coins: 0 };
+let shopAdminState = { isAdmin: false, receipts: [], users: {} };
 
 function shopBuildSection() {
   const tabs = document.getElementById("tabs");
@@ -84,6 +85,17 @@ function shopBuildSection() {
               <span id="shopReceiptsCount" class="shop-count">0</span>
             </div>
             <div id="shopReceipts" class="shop-receipts-grid"></div>
+          </div>
+          <div id="shopAdminReceiptsWrap" class="shop-admin-receipts" hidden>
+            <div class="shop-receipts-head">
+              <div>
+                <p class="shop-toolbar-label">Для админов</p>
+                <h3>Проверка чеков</h3>
+              </div>
+              <button id="shopAdminRefresh" class="tasks-refresh" type="button">Обновить</button>
+            </div>
+            <p id="shopAdminStatus" class="shop-status"></p>
+            <div id="shopAdminReceipts" class="shop-receipts-grid"></div>
           </div>
         </article>
       </section>
@@ -199,6 +211,7 @@ async function shopLoad() {
   shopState.coins = Number(users?.[0]?.coins || 0);
   shopState.receipts = receipts || [];
   shopRender();
+  shopAdminLoad().catch(() => {});
 }
 
 async function shopBuy(itemId) {
@@ -217,6 +230,104 @@ async function shopBuy(itemId) {
   }
 }
 
+function shopAdminUserName(id) {
+  const user = shopAdminState.users[String(id)];
+  if (!user) return `ID ${id}`;
+  if (user.first_name) return user.first_name;
+  if (user.username) return `@${user.username}`;
+  return `ID ${id}`;
+}
+
+async function shopAdminIsAllowed() {
+  if (!userId) return false;
+  const rootIds = typeof ROOT_ADMIN_IDS !== "undefined" ? ROOT_ADMIN_IDS.map(String) : ["818748106", "747818163", "5311640125"];
+  if (rootIds.includes(String(userId))) return true;
+  const managers = await shopFetch(`managers?telegram_id=eq.${userId}&select=telegram_id&limit=1`).catch(() => []);
+  return Boolean(managers?.length);
+}
+
+function shopAdminRender() {
+  const wrap = document.getElementById("shopAdminReceiptsWrap");
+  const root = document.getElementById("shopAdminReceipts");
+  const refresh = document.getElementById("shopAdminRefresh");
+  if (!wrap || !root) return;
+  wrap.hidden = !shopAdminState.isAdmin;
+  if (!shopAdminState.isAdmin) return;
+
+  const active = shopAdminState.receipts.filter(item => new Date(item.expires_at).getTime() > Date.now());
+  root.innerHTML = active.map(item => `
+    <article class="shop-receipt reward-receipt admin-receipt-card">
+      <div class="receipt-done">🎟️</div>
+      <small>Проверить чек</small>
+      <strong>${shopEscape(item.item_title)}</strong>
+      <div class="shop-code">${shopEscape(item.receipt_code)}</div>
+      <span>Сотрудник: ${shopEscape(shopAdminUserName(item.user_id))}</span>
+      <span>До: ${shopEscape(shopFormatTime(item.expires_at))}</span>
+      <span>Стоимость: 🪙 ${Number(item.price_coins || 0)}</span>
+      <button class="shop-buy admin-confirm-receipt" data-confirm-receipt="${item.id}">Подтвердить выдачу</button>
+    </article>
+  `).join("") || `
+    <div class="shop-empty shop-empty-card">
+      <strong>Активных чеков нет</strong>
+      <span>Когда сотрудник купит награду, чек появится здесь.</span>
+    </div>
+  `;
+  document.querySelectorAll("[data-confirm-receipt]").forEach(button => {
+    button.onclick = () => shopAdminConfirmReceipt(Number(button.dataset.confirmReceipt));
+  });
+  if (refresh) refresh.onclick = () => shopAdminLoad(true).catch(() => {});
+}
+
+async function shopAdminLoad(force = false) {
+  shopBuildSection();
+  if (!userId) return;
+  if (!force && shopAdminState.isAdmin === false) {
+    shopAdminState.isAdmin = await shopAdminIsAllowed();
+  }
+  if (!shopAdminState.isAdmin) {
+    shopAdminRender();
+    return;
+  }
+  const receipts = await shopFetch("shop_purchases?status=eq.active&select=*&order=created_at.desc&limit=100").catch(() => []);
+  const userIds = [...new Set((receipts || []).map(item => item.user_id).filter(Boolean).map(String))];
+  let users = {};
+  if (userIds.length) {
+    const rows = await shopFetch(`users?telegram_id=in.(${userIds.join(",")})&select=telegram_id,username,first_name,last_name`).catch(() => []);
+    users = Object.fromEntries((rows || []).map(row => [String(row.telegram_id), row]));
+  }
+  shopAdminState.receipts = receipts || [];
+  shopAdminState.users = users;
+  shopAdminRender();
+}
+
+async function shopAdminConfirmReceipt(id) {
+  const status = document.getElementById("shopAdminStatus");
+  const receipt = shopAdminState.receipts.find(item => Number(item.id) === Number(id));
+  if (!receipt) return;
+  if (!confirm(`Выдать награду по чеку ${receipt.receipt_code}?`)) return;
+  try {
+    if (status) status.textContent = "Подтверждаем чек...";
+    await shopFetch(`shop_purchases?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "redeemed" }),
+    });
+    if (status) status.textContent = "✅ Чек подтверждён. Награда выдана.";
+    await shopAdminLoad(true);
+    await shopLoad();
+  } catch (error) {
+    if (status) status.textContent = "Не получилось подтвердить чек. Проверь права Supabase для shop_purchases.";
+  }
+}
+
+function shopAdminInjectStyle() {
+  if (document.getElementById("shopAdminStyle")) return;
+  document.head.insertAdjacentHTML("beforeend", `<style id="shopAdminStyle">
+    .shop-admin-receipts{margin-top:24px;padding-top:6px}.admin-receipt-card{border-style:solid}.admin-confirm-receipt{margin-top:14px;width:100%}
+  </style>`);
+}
+
+shopAdminInjectStyle();
 shopBuildSection();
 shopLoad().catch(() => {});
 setInterval(() => shopLoad().catch(() => {}), 15000);
