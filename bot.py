@@ -5,24 +5,24 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/?v=bk-staff-2")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/?v=employees-3")
 router = Router()
 
 
 def app_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Открыть приложение", url=MINI_APP_URL)
+        InlineKeyboardButton(text="Открыть BK8 Staff", url=MINI_APP_URL)
     ]])
 
 
 @router.message(CommandStart())
 async def start_handler(message: Message):
-    await message.answer("Привет! Открывай BK Staff ниже.", reply_markup=app_keyboard())
+    await message.answer("Открывай BK8 Staff ниже.", reply_markup=app_keyboard())
 
 
 @router.message(Command("app"))
 async def app_handler(message: Message):
-    await message.answer("Открыть приложение:", reply_markup=app_keyboard())
+    await message.answer("Открыть BK8 Staff:", reply_markup=app_keyboard())
 
 
 async def main():
