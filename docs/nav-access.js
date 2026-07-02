@@ -1,7 +1,7 @@
 function navAllowedAction(name) {
   const section = document.getElementById(`tab-${name}`);
   if (!section) return false;
-  if (["admin", "managers", "tasks", "instructor"].includes(name)) {
+  if (["admin", "managers", "tasks", "instructor", "employees"].includes(name)) {
     return Boolean(document.querySelector(`#tabs .tab[data-tab="${name}"]`));
   }
   return true;
@@ -17,20 +17,38 @@ function navCleanQuickActions() {
   if (card && grid && !grid.children.length) card.remove();
 }
 
+function loadScriptOnce(src) {
+  return new Promise(resolve => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = resolve;
+    document.body.appendChild(script);
+  });
+}
+
+function loadStyleOnce(href) {
+  if (document.querySelector(`link[href="${href}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.appendChild(link);
+}
+
 function loadEmployeeRegistrationScripts() {
   if (window.__employeeScriptsLoading) return;
   window.__employeeScriptsLoading = true;
   const scripts = ["employee-core.js?v=2", "employee-activate.js?v=2", "employee-admin.js?v=2", "employee-loader.js?v=2"];
   let chain = Promise.resolve();
-  scripts.forEach(src => {
-    chain = chain.then(() => new Promise(resolve => {
-      if (document.querySelector(`script[src="${src}"]`)) return resolve();
-      const script = document.createElement("script");
-      script.src = src;
-      script.onload = resolve;
-      script.onerror = resolve;
-      document.body.appendChild(script);
-    }));
+  scripts.forEach(src => chain = chain.then(() => loadScriptOnce(src)));
+}
+
+function loadEmployeesSection() {
+  loadStyleOnce("employees.css?v=3");
+  loadScriptOnce("employees.js?v=3").then(() => {
+    if (typeof emp2Load === "function") emp2Load();
+    if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
 }
 
@@ -38,3 +56,5 @@ setTimeout(navCleanQuickActions, 400);
 setTimeout(navCleanQuickActions, 1200);
 setInterval(navCleanQuickActions, 2000);
 setTimeout(loadEmployeeRegistrationScripts, 500);
+setTimeout(loadEmployeesSection, 700);
+setTimeout(loadEmployeesSection, 2200);
