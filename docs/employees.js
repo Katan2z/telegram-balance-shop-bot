@@ -12,7 +12,8 @@ function emp2Code() {
 }
 
 function emp2IsRoot() {
-  return Boolean(window.userId && Array.isArray(ROOT_ADMIN_IDS) && ROOT_ADMIN_IDS.map(String).includes(String(userId)));
+  const id = String(window.userId || userId || "");
+  return id === "818748106";
 }
 
 function emp2Build() {
@@ -197,4 +198,5 @@ async function emp2Load() {
 }
 
 setTimeout(emp2Load, 800);
+setTimeout(emp2Load, 2000);
 setInterval(emp2Load, 30000);
