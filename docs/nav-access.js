@@ -17,6 +17,16 @@ function navCleanQuickActions() {
   if (card && grid && !grid.children.length) card.remove();
 }
 
+function loadEmployeeRegistrationScripts() {
+  ["employee-core.js?v=1", "employee-activate.js?v=1", "employee-admin.js?v=1", "employee-loader.js?v=1"].forEach(src => {
+    if (document.querySelector(`script[src="${src}"]`)) return;
+    const script = document.createElement("script");
+    script.src = src;
+    document.body.appendChild(script);
+  });
+}
+
 setTimeout(navCleanQuickActions, 400);
 setTimeout(navCleanQuickActions, 1200);
 setInterval(navCleanQuickActions, 2000);
+setTimeout(loadEmployeeRegistrationScripts, 900);
