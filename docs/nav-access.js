@@ -18,15 +18,23 @@ function navCleanQuickActions() {
 }
 
 function loadEmployeeRegistrationScripts() {
-  ["employee-core.js?v=1", "employee-activate.js?v=1", "employee-admin.js?v=1", "employee-loader.js?v=1"].forEach(src => {
-    if (document.querySelector(`script[src="${src}"]`)) return;
-    const script = document.createElement("script");
-    script.src = src;
-    document.body.appendChild(script);
+  if (window.__employeeScriptsLoading) return;
+  window.__employeeScriptsLoading = true;
+  const scripts = ["employee-core.js?v=2", "employee-activate.js?v=2", "employee-admin.js?v=2", "employee-loader.js?v=2"];
+  let chain = Promise.resolve();
+  scripts.forEach(src => {
+    chain = chain.then(() => new Promise(resolve => {
+      if (document.querySelector(`script[src="${src}"]`)) return resolve();
+      const script = document.createElement("script");
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = resolve;
+      document.body.appendChild(script);
+    }));
   });
 }
 
 setTimeout(navCleanQuickActions, 400);
 setTimeout(navCleanQuickActions, 1200);
 setInterval(navCleanQuickActions, 2000);
-setTimeout(loadEmployeeRegistrationScripts, 900);
+setTimeout(loadEmployeeRegistrationScripts, 500);
