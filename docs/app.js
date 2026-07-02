@@ -5,7 +5,7 @@ const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
 const medal = ["🥇", "🥈", "🥉"];
 const BOT_USERNAME = "bk8_shop_bot";
-const ROOT_ADMIN_IDS = ["818748106", "747818163", "5311640125"];
+const ROOT_ADMIN_IDS = ["818748106"];
 const RAW_DATA_URL = "https://raw.githubusercontent.com/Katan2z/telegram-balance-shop-bot/main/docs/public-data.json";
 
 function setText(id, value) {
@@ -50,6 +50,12 @@ function userNameFromRow(row) {
   if (row.first_name) return row.first_name;
   if (row.username) return `@${row.username}`;
   return "Сотрудник";
+}
+
+function profileNameFromRow(row) {
+  const name = String(row?.full_name || "").trim();
+  if (!name || name === "Ожидает регистрации") return "";
+  return name;
 }
 
 function supabaseConfig() {
@@ -116,20 +122,27 @@ function preserveSelectValue(select, html) {
 }
 
 async function loadSupabaseData() {
-  const [usersRows, managerRows, instructorRows, klokrRows] = await Promise.all([
+  const [usersRows, managerRows, instructorRows, klokrRows, profileRows] = await Promise.all([
     supabaseFetch("users?select=telegram_id,username,first_name,last_name,balance,coins,updated_at&order=balance.desc"),
     supabaseFetch("managers?select=telegram_id,created_by,created_at"),
     supabaseFetch("instructors?select=telegram_id,created_by,created_at").catch(() => []),
     supabaseFetch("klokr_assessments?select=id,employee_id,instructor_id,total_score,max_score,percent,created_at&order=percent.desc,created_at.desc&limit=3").catch(() => []),
+    supabaseFetch("employee_profiles?activation_status=eq.active&select=telegram_id,full_name,position,restaurant").catch(() => []),
   ]);
+
+  const profilesByTelegram = Object.fromEntries((profileRows || [])
+    .filter(row => row.telegram_id)
+    .map(row => [String(row.telegram_id), row]));
 
   const users = {};
   for (const row of usersRows) {
     const id = String(row.telegram_id);
     const balance = Number(row.balance || 0);
     const coins = Number(row.coins || 0);
+    const profileName = profileNameFromRow(profilesByTelegram[id]);
     users[id] = {
-      name: userNameFromRow(row),
+      name: profileName || userNameFromRow(row),
+      profile_name: profileName,
       balance,
       coins,
       received_month: balance,
@@ -247,6 +260,7 @@ function renderMyStats(data) {
     setText("coinsBalance", 0);
     return;
   }
+  setText("userName", publicUser.name || user?.first_name || user?.username || "Сотрудник");
   const rank = getUserRank(data, userId);
   const balance = Number(publicUser.balance || 0);
   const coins = Number(publicUser.coins || 0);
