@@ -294,6 +294,213 @@ function ensureAdminTabs(data) {
     tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="managers">Менеджеры</button>');
     tabs.querySelector('[data-tab="managers"]').addEventListener("click", () => switchTab("managers"));
   }
+  if (isRootAdmin(data) && !tabs.querySelector('[data-tab="employees"]')) {
+    tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="employees">Сотрудники</button>');
+    tabs.querySelector('[data-tab="employees"]').addEventListener("click", () => switchTab("employees"));
+  }
+}
+
+const employeesState = { rows: [], editingId: null, query: "" };
+
+function employeeCode() {
+  return "BK8-" + Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+function employeeBuildSection(data) {
+  if (!isRootAdmin(data)) return;
+  const app = document.querySelector("main.app");
+  if (!app || document.getElementById("tab-employees")) return;
+  app.insertAdjacentHTML("beforeend", `
+    <section class="tab-page" id="tab-employees">
+      <article class="card employee-v2-panel">
+        <div class="employee-v2-hero">
+          <div>
+            <p class="label">BK8 Staff</p>
+            <h2>👥 Сотрудники</h2>
+            <p>Профили, коды регистрации и основа для документов, табеля и личного кабинета.</p>
+          </div>
+          <button id="employeeRefresh" class="tasks-refresh">Обновить</button>
+        </div>
+        <div class="employee-v2-layout">
+          <div class="employee-v2-form">
+            <h3 id="employeeFormTitle">Новый сотрудник</h3>
+            <input id="employeeFullName" placeholder="ФИО для правки после регистрации" />
+            <input id="employeePosition" placeholder="Должность" />
+            <input id="employeeRestaurant" placeholder="Ресторан" />
+            <input id="employeePhone" placeholder="Телефон" />
+            <input id="employeeBirth" type="date" />
+            <div class="admin-actions">
+              <button id="employeeCreate" class="action-btn add">Создать код</button>
+              <button id="employeeSave" class="action-btn add" hidden>Сохранить</button>
+              <button id="employeeCancel" class="action-btn remove" hidden>Отмена</button>
+            </div>
+            <p id="employeeStatus" class="employee-status"></p>
+          </div>
+          <div class="employee-v2-list-wrap">
+            <input id="employeeSearch" class="employee-v2-search" placeholder="Поиск по ФИО, должности, ресторану" />
+            <div id="employeeStats" class="klokr-result-preview"></div>
+            <div id="employeeList" class="employee-v2-list"></div>
+          </div>
+        </div>
+      </article>
+    </section>
+  `);
+  employeeBind();
+}
+
+function employeeBind() {
+  const refresh = document.getElementById("employeeRefresh");
+  const create = document.getElementById("employeeCreate");
+  const save = document.getElementById("employeeSave");
+  const cancel = document.getElementById("employeeCancel");
+  const search = document.getElementById("employeeSearch");
+  if (refresh) refresh.onclick = employeeLoad;
+  if (create) create.onclick = employeeCreate;
+  if (save) save.onclick = employeeSave;
+  if (cancel) cancel.onclick = employeeCancel;
+  if (search) search.oninput = event => {
+    employeesState.query = event.target.value.toLowerCase();
+    employeeRender();
+  };
+}
+
+function employeeValues() {
+  const name = document.getElementById("employeeFullName")?.value.trim().replace(/\s+/g, " ") || "";
+  return {
+    full_name: name || "Ожидает регистрации",
+    position: document.getElementById("employeePosition")?.value.trim() || "",
+    restaurant: document.getElementById("employeeRestaurant")?.value.trim() || "",
+    phone: document.getElementById("employeePhone")?.value.trim() || "",
+    birth_date: document.getElementById("employeeBirth")?.value || null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function employeeCancel() {
+  employeesState.editingId = null;
+  const title = document.getElementById("employeeFormTitle");
+  if (title) title.textContent = "Новый сотрудник";
+  ["employeeFullName", "employeePosition", "employeeRestaurant", "employeePhone", "employeeBirth"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const create = document.getElementById("employeeCreate");
+  const save = document.getElementById("employeeSave");
+  const cancel = document.getElementById("employeeCancel");
+  if (create) create.hidden = false;
+  if (save) save.hidden = true;
+  if (cancel) cancel.hidden = true;
+}
+
+function employeeEdit(id) {
+  const row = employeesState.rows.find(item => Number(item.id) === Number(id));
+  if (!row) return;
+  employeesState.editingId = row.id;
+  document.getElementById("employeeFormTitle").textContent = "Редактирование профиля";
+  document.getElementById("employeeFullName").value = row.full_name === "Ожидает регистрации" ? "" : (row.full_name || "");
+  document.getElementById("employeePosition").value = row.position || "";
+  document.getElementById("employeeRestaurant").value = row.restaurant || "";
+  document.getElementById("employeePhone").value = row.phone || "";
+  document.getElementById("employeeBirth").value = row.birth_date || "";
+  document.getElementById("employeeCreate").hidden = true;
+  document.getElementById("employeeSave").hidden = false;
+  document.getElementById("employeeCancel").hidden = false;
+  document.getElementById("tab-employees")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function employeeCreate() {
+  const status = document.getElementById("employeeStatus");
+  const data = employeeValues();
+  data.activation_code = employeeCode();
+  data.activation_status = "pending";
+  data.created_by = Number(userId);
+  data.created_at = new Date().toISOString();
+  try {
+    await supabaseWrite("employee_profiles", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(data) });
+    if (status) status.innerHTML = `Код создан: <b>${htmlEscape(data.activation_code)}</b>`;
+    employeeCancel();
+    await employeeLoad();
+  } catch (error) {
+    if (status) status.textContent = "Не получилось создать код. Проверь SQL employee_profiles.";
+  }
+}
+
+async function employeeSave() {
+  const status = document.getElementById("employeeStatus");
+  if (!employeesState.editingId) return;
+  try {
+    await supabaseWrite(`employee_profiles?id=eq.${employeesState.editingId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(employeeValues()) });
+    if (status) status.textContent = "Профиль сохранён.";
+    employeeCancel();
+    await employeeLoad();
+    await renderApp();
+  } catch (error) {
+    if (status) status.textContent = "Не получилось сохранить профиль.";
+  }
+}
+
+async function employeeArchive(id) {
+  if (!confirm("Архивировать сотрудника?")) return;
+  await supabaseWrite(`employee_profiles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ activation_status: "archived", updated_at: new Date().toISOString() }) });
+  await employeeLoad();
+}
+
+function employeeCopy(code) {
+  navigator.clipboard?.writeText(code);
+  const status = document.getElementById("employeeStatus");
+  if (status) status.textContent = "Код скопирован: " + code;
+}
+
+function employeeFiltered() {
+  const q = employeesState.query;
+  if (!q) return employeesState.rows;
+  return employeesState.rows.filter(row => [row.full_name, row.position, row.restaurant, row.phone, row.activation_code].join(" ").toLowerCase().includes(q));
+}
+
+function employeeRender() {
+  const stats = document.getElementById("employeeStats");
+  const root = document.getElementById("employeeList");
+  if (!stats || !root) return;
+  const rows = employeesState.rows || [];
+  const active = rows.filter(row => row.activation_status === "active").length;
+  const pending = rows.filter(row => row.activation_status === "pending").length;
+  const archived = rows.filter(row => row.activation_status === "archived").length;
+  stats.innerHTML = `<div><span>Всего</span><strong>${rows.length}</strong></div><div><span>Активны</span><strong>${active}</strong></div><div><span>Ожидают</span><strong>${pending}</strong></div><div><span>Архив</span><strong>${archived}</strong></div>`;
+  root.innerHTML = employeeFiltered().map(row => {
+    const archivedClass = row.activation_status === "archived" ? " is-archived" : "";
+    const name = row.activation_status === "active" ? row.full_name : (row.full_name === "Ожидает регистрации" ? "Ожидает ФИО" : row.full_name);
+    return `<article class="employee-v2-card${archivedClass}">
+      <div class="employee-v2-avatar">${htmlEscape(initials(name || "BK"))}</div>
+      <div class="employee-v2-main">
+        <strong>${htmlEscape(name || "Сотрудник")}</strong>
+        <span>${htmlEscape(row.position || "Должность не указана")} · ${htmlEscape(row.restaurant || "Ресторан не указан")}</span>
+        <small>${row.activation_status === "active" ? "активирован" : row.activation_status === "archived" ? "архив" : "ожидает регистрации"}${row.telegram_id ? " · TG " + htmlEscape(row.telegram_id) : ""}</small>
+      </div>
+      <div class="employee-v2-actions">
+        <code>${htmlEscape(row.activation_code || "—")}</code>
+        <button class="tasks-refresh" onclick="employeeCopy('${htmlEscape(row.activation_code || "")}')">Копировать</button>
+        <button class="tasks-refresh" onclick="employeeEdit(${Number(row.id)})">Править</button>
+        ${row.activation_status === "archived" ? "" : `<button class="task-delete-icon" onclick="employeeArchive(${Number(row.id)})">×</button>`}
+      </div>
+    </article>`;
+  }).join("") || `<div class="shop-empty-card"><strong>Сотрудников пока нет</strong><span>Создай первый код регистрации.</span></div>`;
+}
+
+async function employeeLoad() {
+  employeesState.rows = await supabaseFetch("employee_profiles?select=*&order=created_at.desc&limit=300").catch(() => []);
+  employeeRender();
+}
+
+function employeeInjectStyle() {
+  if (document.getElementById("employeeCoreStyle")) return;
+  document.head.insertAdjacentHTML("beforeend", `<style id="employeeCoreStyle">.employee-v2-hero{display:flex;justify-content:space-between;gap:14px;padding:22px;border-radius:34px;background:#32160e;color:#fff7df}.employee-v2-hero h2{margin:0;font-size:42px}.employee-v2-layout{display:grid;grid-template-columns:360px 1fr;gap:16px;margin-top:16px}.employee-v2-form,.employee-v2-list-wrap{padding:16px;border-radius:28px;background:#fffdf7;border:1px solid #ead8c2}.employee-v2-form input,.employee-v2-search{width:100%;box-sizing:border-box;border:1px solid #e2c8aa;border-radius:18px;padding:13px;background:#fffaf0;margin-bottom:9px}.employee-v2-list{display:grid;gap:10px;margin-top:12px}.employee-v2-card{display:grid;grid-template-columns:60px 1fr auto;gap:12px;align-items:center;padding:12px;border-radius:24px;background:#fff4d5}.employee-v2-card.is-archived{opacity:.55}.employee-v2-avatar{width:60px;height:60px;border-radius:20px;display:grid;place-items:center;background:#32160e;color:#ffd25a;font-weight:900}.employee-v2-main strong,.employee-v2-main span,.employee-v2-main small{display:block}.employee-v2-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.employee-v2-actions code{padding:8px 10px;border-radius:13px;background:#32160e;color:#ffd25a;font-weight:900}.employee-status{min-height:22px;color:#d82716;font-weight:900}@media(max-width:900px){.employee-v2-layout{grid-template-columns:1fr}.employee-v2-card{grid-template-columns:48px 1fr}.employee-v2-avatar{width:48px;height:48px}.employee-v2-actions{grid-column:1/-1;justify-content:flex-start}}</style>`);
+}
+
+async function setupEmployees(data) {
+  if (!isRootAdmin(data)) return;
+  employeeInjectStyle();
+  employeeBuildSection(data);
+  await employeeLoad();
 }
 
 function setupAdmin(data) {
@@ -440,6 +647,7 @@ async function renderApp() {
     renderHero(data.top_month);
     renderKlokrTop(data.klokr_top);
     setupAdmin(data);
+    await setupEmployees(data);
   } catch (error) {
     setText("userName", "Не удалось загрузить данные");
   }
