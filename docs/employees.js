@@ -22,6 +22,8 @@ function emp2Build() {
   const tabs = document.getElementById("tabs");
   const app = document.querySelector("main.app");
   if (!tabs || !app) return;
+  const legacy = document.getElementById("tab-employees");
+  if (legacy && !document.getElementById("emp2Refresh")) legacy.remove();
   if (!tabs.querySelector('[data-tab="employees"]')) {
     tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="employees">Сотрудники</button>');
     tabs.querySelector('[data-tab="employees"]').onclick = () => switchTab("employees");
