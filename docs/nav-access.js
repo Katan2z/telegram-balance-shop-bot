@@ -47,6 +47,7 @@ function loadEmployeeRegistrationScripts() {
 function loadEmployeesSection() {
   loadStyleOnce("employees.css?v=4");
   loadScriptOnce("employees.js?v=4").then(() => {
+    loadScriptOnce("employees-remove.js?v=1");
     if (typeof emp2Load === "function") emp2Load();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
@@ -54,7 +55,7 @@ function loadEmployeesSection() {
 
 function loadMyProfileSection() {
   loadStyleOnce("my-profile.css?v=4");
-  loadScriptOnce("my-profile.js?v=4").then(() => {
+  loadScriptOnce("my-profile.js?v=5").then(() => {
     if (typeof myProfileLoad === "function") myProfileLoad();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
