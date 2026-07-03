@@ -60,6 +60,19 @@ function loadMyProfileSection() {
   });
 }
 
+function singleRestaurantCleanup() {
+  ["employeeRestaurant", "empRestaurant"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.value = "";
+      el.style.display = "none";
+    }
+  });
+  document.querySelectorAll(".employee-v2-main span").forEach(el => {
+    if (el.textContent.includes(" · ")) el.textContent = el.textContent.split(" · ")[0];
+  });
+}
+
 setTimeout(navCleanQuickActions, 400);
 setTimeout(navCleanQuickActions, 1200);
 setInterval(navCleanQuickActions, 2000);
@@ -68,3 +81,4 @@ setTimeout(loadEmployeesSection, 700);
 setTimeout(loadEmployeesSection, 2200);
 setTimeout(loadMyProfileSection, 800);
 setTimeout(loadMyProfileSection, 2400);
+setInterval(singleRestaurantCleanup, 800);
