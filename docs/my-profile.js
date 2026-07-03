@@ -1,4 +1,4 @@
-const myProfileState = { profile: null, userRow: null };
+const myProfileState = { profile: null, userRow: null, timesheet: null };
 
 function myProfileUserId() {
   const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -32,6 +32,19 @@ async function myProfileFetch(path) {
   return response.json();
 }
 
+function myProfileHoursText(value) {
+  const n = Number(value || 0);
+  if (!n) return "—";
+  return (Number.isInteger(n) ? String(n) : String(n).replace(".", ",")) + " ч.";
+}
+
+function myProfileDateText(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 16).replace("T", " ");
+  return d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function myProfileBuildSection() {
   const app = document.querySelector("main.app");
   const tabs = document.getElementById("tabs");
@@ -54,6 +67,17 @@ function myProfileAddHomeCard() {
   }
 }
 
+function myProfileShowHours() {
+  const root = document.getElementById("profileActionContent");
+  if (!root) return;
+  const t = myProfileState.timesheet;
+  if (!t) {
+    root.innerHTML = `<div class="profile-action-card"><h3>🕒 Часы</h3><p>Табель ещё не загружен.</p></div>`;
+    return;
+  }
+  root.innerHTML = `<div class="profile-action-card"><h3>🕒 Часы</h3><span>Отработано:</span><strong>${myProfileEscape(myProfileHoursText(t.hours))}</strong><span>Последнее обновление:</span><p>${myProfileEscape(myProfileDateText(t.updated_at))}</p></div>`;
+}
+
 function myProfileRender() {
   myProfileBuildSection();
   const root = document.getElementById("profileContent");
@@ -62,6 +86,7 @@ function myProfileRender() {
   const user = myProfileState.userRow || {};
   const balance = Number(user.balance || 0);
   const coins = Number(user.coins || 0);
+  const hours = myProfileState.timesheet ? myProfileHoursText(myProfileState.timesheet.hours) : "—";
 
   if (!profile) {
     root.innerHTML = `<div class="profile-hero empty"><div class="profile-avatar">BK</div><div><p class="label">BK8 Staff</p><h2>Профиль не активирован</h2><p>Зарегистрируйся по коду приглашения.</p></div></div>`;
@@ -82,7 +107,7 @@ function myProfileRender() {
       <div><span>Спасибки</span><strong>${balance}</strong></div>
       <div><span>Монетки</span><strong>${coins}</strong></div>
       <div><span>КЛОКР</span><strong>—</strong></div>
-      <div><span>Часы</span><strong>—</strong></div>
+      <div><span>Часы</span><strong>${myProfileEscape(hours)}</strong></div>
     </div>
 
     <div class="profile-roadmap employee-only">
@@ -90,10 +115,11 @@ function myProfileRender() {
         <div>⭐ Спасибки</div>
         <div>🪙 Монетки</div>
         <div>🏆 КЛОКР</div>
-        <div>🕒 Часы</div>
+        <button type="button" onclick="myProfileShowHours()">🕒 Часы</button>
         <div>🛒 Покупки</div>
       </div>
     </div>
+    <div id="profileActionContent"></div>
   `;
 }
 
@@ -111,6 +137,12 @@ async function myProfileLoad() {
   ]);
   myProfileState.profile = profiles?.[0] || null;
   myProfileState.userRow = users?.[0] || null;
+  if (myProfileState.profile?.id) {
+    const rows = await myProfileFetch(`employee_timesheets?employee_profile_id=eq.${myProfileState.profile.id}&period=eq.current&select=hours,updated_at&limit=1`).catch(() => []);
+    myProfileState.timesheet = rows?.[0] || null;
+  } else {
+    myProfileState.timesheet = null;
+  }
   myProfileRender();
   myProfileAddHomeCard();
 }
