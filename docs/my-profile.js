@@ -41,13 +41,7 @@ function myProfileBuildSection() {
     tabs.querySelector('[data-tab="profile"]').onclick = () => typeof switchTab === "function" ? switchTab("profile") : null;
   }
   if (!document.getElementById("tab-profile")) {
-    app.insertAdjacentHTML("beforeend", `
-      <section class="tab-page" id="tab-profile">
-        <article class="card profile-panel">
-          <div id="profileContent"></div>
-        </article>
-      </section>
-    `);
+    app.insertAdjacentHTML("beforeend", `<section class="tab-page" id="tab-profile"><article class="card profile-panel"><div id="profileContent"></div></article></section>`);
   }
 }
 
@@ -56,11 +50,7 @@ function myProfileAddHomeCard() {
   if (!home || document.querySelector('[data-nav-action="profile"]')) return;
   const grid = document.querySelector("#quickActionsCard .quick-actions-grid");
   if (grid) {
-    grid.insertAdjacentHTML("afterbegin", `
-      <button class="nav-action" type="button" data-nav-action="profile" onclick="typeof navSwitch==='function'?navSwitch('profile'):typeof switchTab==='function'?switchTab('profile'):null">
-        <span>👤</span><strong>Мой профиль</strong><small>Личные данные</small>
-      </button>
-    `);
+    grid.insertAdjacentHTML("afterbegin", `<button class="nav-action" type="button" data-nav-action="profile" onclick="typeof navSwitch==='function'?navSwitch('profile'):typeof switchTab==='function'?switchTab('profile'):null"><span>👤</span><strong>Мой профиль</strong><small>Кабинет</small></button>`);
   }
 }
 
@@ -74,16 +64,7 @@ function myProfileRender() {
   const coins = Number(user.coins || 0);
 
   if (!profile) {
-    root.innerHTML = `
-      <div class="profile-hero empty">
-        <div class="profile-avatar">BK</div>
-        <div>
-          <p class="label">BK8 Staff</p>
-          <h2>Профиль не активирован</h2>
-          <p>Когда сотрудник зарегистрируется по коду, здесь появятся его личные данные, документы, часы и история.</p>
-        </div>
-      </div>
-    `;
+    root.innerHTML = `<div class="profile-hero empty"><div class="profile-avatar">BK</div><div><p class="label">BK8 Staff</p><h2>Профиль не активирован</h2><p>Зарегистрируйся по коду приглашения.</p></div></div>`;
     return;
   }
 
@@ -91,35 +72,25 @@ function myProfileRender() {
     <div class="profile-hero">
       <div class="profile-avatar">${myProfileEscape(myProfileInitials(profile.full_name))}</div>
       <div class="profile-title">
-        <p class="label">Личный кабинет</p>
+        <p class="label">Мой профиль</p>
         <h2>${myProfileEscape(profile.full_name || "Сотрудник")}</h2>
         <span>${myProfileEscape(profile.position || "Должность не указана")}</span>
       </div>
-      <div class="profile-status">${profile.activation_status === "active" ? "🟢 Активен" : "🟡 " + myProfileEscape(profile.activation_status || "ожидает")}</div>
     </div>
 
     <div class="profile-stat-grid">
       <div><span>Спасибки</span><strong>${balance}</strong></div>
       <div><span>Монетки</span><strong>${coins}</strong></div>
       <div><span>КЛОКР</span><strong>—</strong></div>
-      <div><span>Документы</span><strong>скоро</strong></div>
+      <div><span>Часы</span><strong>—</strong></div>
     </div>
 
-    <div class="profile-info-grid">
-      <div><span>ФИО</span><strong>${myProfileEscape(profile.full_name || "—")}</strong></div>
-      <div><span>Должность</span><strong>${myProfileEscape(profile.position || "—")}</strong></div>
-      <div><span>Телефон</span><strong>${myProfileEscape(profile.phone || "—")}</strong></div>
-      <div><span>Дата рождения</span><strong>${myProfileEscape(profile.birth_date || "—")}</strong></div>
-      <div><span>Telegram ID</span><strong>${myProfileEscape(profile.telegram_id || myProfileUserId() || "—")}</strong></div>
-      <div><span>Дата регистрации</span><strong>${profile.activated_at ? new Date(profile.activated_at).toLocaleDateString("ru-RU") : "—"}</strong></div>
-    </div>
-
-    <div class="profile-roadmap">
-      <h3>Скоро здесь</h3>
+    <div class="profile-roadmap employee-only">
       <div class="profile-roadmap-grid">
-        <div>📄 Документы</div>
-        <div>🕒 Табель</div>
+        <div>⭐ Спасибки</div>
+        <div>🪙 Монетки</div>
         <div>🏆 КЛОКР</div>
+        <div>🕒 Часы</div>
         <div>🛒 Покупки</div>
       </div>
     </div>
