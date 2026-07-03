@@ -1,7 +1,7 @@
 function navAllowedAction(name) {
   const section = document.getElementById(`tab-${name}`);
   if (!section) return false;
-  if (["admin", "managers", "tasks", "instructor", "employees"].includes(name)) {
+  if (["admin", "managers", "tasks", "instructor", "employees", "profile"].includes(name)) {
     return Boolean(document.querySelector(`#tabs .tab[data-tab="${name}"]`));
   }
   return true;
@@ -52,9 +52,19 @@ function loadEmployeesSection() {
   });
 }
 
+function loadMyProfileSection() {
+  loadStyleOnce("my-profile.css?v=2");
+  loadScriptOnce("my-profile.js?v=2").then(() => {
+    if (typeof myProfileLoad === "function") myProfileLoad();
+    if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
+  });
+}
+
 setTimeout(navCleanQuickActions, 400);
 setTimeout(navCleanQuickActions, 1200);
 setInterval(navCleanQuickActions, 2000);
 setTimeout(loadEmployeeRegistrationScripts, 500);
 setTimeout(loadEmployeesSection, 700);
 setTimeout(loadEmployeesSection, 2200);
+setTimeout(loadMyProfileSection, 800);
+setTimeout(loadMyProfileSection, 2400);
