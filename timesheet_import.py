@@ -19,37 +19,49 @@ def cell_hours(value) -> float:
     if value is None or isinstance(value, bool):
         return 0.0
     if isinstance(value, (int, float)):
-        value = float(value)
-        return value if 0 <= value <= 24 else 0.0
+        v = float(value)
+        return v if 0 <= v <= 24 else 0.0
     text = str(value).strip().replace(",", ".")
     if re.fullmatch(r"\d+(\.\d+)?", text):
-        value = float(text)
-        return value if 0 <= value <= 24 else 0.0
+        v = float(text)
+        return v if 0 <= v <= 24 else 0.0
     return 0.0
 
 
-def is_name_match(row_text: str, employee_name: str) -> bool:
-    row = normalize_name(row_text)
-    name = normalize_name(employee_name)
-    if not row or not name:
-        return False
-    if name in row:
-        return True
-    parts = [part for part in name.split() if len(part) > 1]
-    return len(parts) >= 2 and all(part in row for part in parts[:2])
+def is_employee_row(row_text: str, profiles) -> dict | None:
+    row_norm = normalize_name(row_text)
+    if not row_norm:
+        return None
+    for profile in profiles:
+        name = normalize_name(profile.get("timesheet_name") or profile.get("full_name"))
+        if name and name in row_norm and len(name.split()) >= 2:
+            return profile
+    return None
+
+
+def find_hours_in_row(row) -> float:
+    # take the most likely hours value (max numeric <=24)
+    values = []
+    for v in row:
+        h = cell_hours(v)
+        if h > 0:
+            values.append(h)
+    if not values:
+        return 0.0
+    return max(values)
 
 
 def read_rows(path: Path):
     suffix = path.suffix.lower()
     rows = []
     if suffix in {".xlsx", ".xlsm"}:
-        workbook = openpyxl.load_workbook(path, data_only=True, read_only=True)
-        for sheet in workbook.worksheets:
+        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        for sheet in wb.worksheets:
             for row in sheet.iter_rows(values_only=True):
                 rows.append(list(row))
     elif suffix == ".csv":
-        with path.open("r", encoding="utf-8-sig", newline="") as file:
-            rows.extend(list(csv.reader(file)))
+        with path.open("r", encoding="utf-8-sig", newline="") as f:
+            rows.extend(list(csv.reader(f)))
     else:
         raise RuntimeError("Нужен файл .xlsx, .xlsm или .csv")
     return rows
@@ -57,29 +69,37 @@ def read_rows(path: Path):
 
 def parse_timesheet(path: Path, profiles):
     rows = read_rows(path)
-    result = []
-    for profile in profiles:
-        full_name = profile.get("full_name") or "Сотрудник"
-        lookup_name = profile.get("timesheet_name") or full_name
-        total = 0.0
-        matched_rows = 0
-        for row in rows:
-            row_text = " ".join(cell_text(value) for value in row if value is not None)
-            if not is_name_match(row_text, lookup_name):
-                continue
-            hours = sum(cell_hours(value) for value in row)
-            if hours > 0:
-                total += hours
-                matched_rows += 1
-        if matched_rows:
-            result.append({
-                "profile_id": profile.get("id"),
-                "telegram_id": profile.get("telegram_id"),
-                "full_name": full_name,
-                "hours": round(total, 2),
-                "matched_rows": matched_rows,
+
+    result = {p["id"]: {"profile": p, "hours": 0.0, "rows": 0} for p in profiles}
+    current_profile_id = None
+
+    for row in rows:
+        row_text = " ".join(cell_text(v) for v in row if v is not None)
+
+        match = is_employee_row(row_text, profiles)
+        if match:
+            current_profile_id = match["id"]
+            continue
+
+        if current_profile_id and current_profile_id in result:
+            h = find_hours_in_row(row)
+            if h > 0:
+                result[current_profile_id]["hours"] += h
+                result[current_profile_id]["rows"] += 1
+
+    output = []
+    for pid, data in result.items():
+        if data["hours"] > 0:
+            p = data["profile"]
+            output.append({
+                "profile_id": pid,
+                "telegram_id": p.get("telegram_id"),
+                "full_name": p.get("full_name"),
+                "hours": round(data["hours"], 2),
+                "matched_rows": data["rows"],
             })
-    return sorted(result, key=lambda item: item["full_name"])
+
+    return sorted(output, key=lambda x: x["full_name"])
 
 
 def format_hours(value: float) -> str:
