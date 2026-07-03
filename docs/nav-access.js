@@ -39,7 +39,7 @@ function loadStyleOnce(href) {
 function loadEmployeeRegistrationScripts() {
   if (window.__employeeScriptsLoading) return;
   window.__employeeScriptsLoading = true;
-  const scripts = ["employee-core.js?v=3", "employee-activate.js?v=3", "employee-admin.js?v=3", "employee-loader.js?v=3"];
+  const scripts = ["employee-core.js?v=5", "employee-activate.js?v=5", "employee-pin.js?v=1", "employee-admin.js?v=5", "employee-loader.js?v=5"];
   let chain = Promise.resolve();
   scripts.forEach(src => chain = chain.then(() => loadScriptOnce(src)));
 }
