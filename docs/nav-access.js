@@ -39,37 +39,24 @@ function loadStyleOnce(href) {
 function loadEmployeeRegistrationScripts() {
   if (window.__employeeScriptsLoading) return;
   window.__employeeScriptsLoading = true;
-  const scripts = ["employee-core.js?v=6", "employee-activate.js?v=6", "employee-admin.js?v=6", "employee-loader.js?v=6"];
+  const scripts = ["employee-core.js?v=7", "employee-activate.js?v=7", "employee-loader.js?v=7"];
   let chain = Promise.resolve();
   scripts.forEach(src => chain = chain.then(() => loadScriptOnce(src)));
 }
 
 function loadEmployeesSection() {
-  loadStyleOnce("employees.css?v=3");
-  loadScriptOnce("employees.js?v=3").then(() => {
+  loadStyleOnce("employees.css?v=4");
+  loadScriptOnce("employees.js?v=4").then(() => {
     if (typeof emp2Load === "function") emp2Load();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
 }
 
 function loadMyProfileSection() {
-  loadStyleOnce("my-profile.css?v=3");
-  loadScriptOnce("my-profile.js?v=3").then(() => {
+  loadStyleOnce("my-profile.css?v=4");
+  loadScriptOnce("my-profile.js?v=4").then(() => {
     if (typeof myProfileLoad === "function") myProfileLoad();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
-  });
-}
-
-function singleRestaurantCleanup() {
-  ["employeeRestaurant", "empRestaurant"].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.value = "";
-      el.style.display = "none";
-    }
-  });
-  document.querySelectorAll(".employee-v2-main span").forEach(el => {
-    if (el.textContent.includes(" · ")) el.textContent = el.textContent.split(" · ")[0];
   });
 }
 
@@ -81,4 +68,3 @@ setTimeout(loadEmployeesSection, 700);
 setTimeout(loadEmployeesSection, 2200);
 setTimeout(loadMyProfileSection, 800);
 setTimeout(loadMyProfileSection, 2400);
-setInterval(singleRestaurantCleanup, 800);
