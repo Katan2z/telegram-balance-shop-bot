@@ -7,6 +7,16 @@ function emp2Escape(value) {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
+function emp2ErrorText(error) {
+  const text = String(error?.message || error || "Неизвестная ошибка");
+  try {
+    const parsed = JSON.parse(text);
+    return parsed.message || parsed.details || parsed.hint || text;
+  } catch (_) {
+    return text;
+  }
+}
+
 function emp2Code() {
   return "BK8-" + Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
 }
@@ -32,13 +42,7 @@ function emp2Build() {
   app.insertAdjacentHTML("beforeend", `
     <section class="tab-page" id="tab-employees">
       <article class="card employee-v2-panel">
-        <div class="employee-v2-hero">
-          <div>
-            <p class="label">BK8 Staff</p>
-            <h2>👥 Сотрудники</h2>
-          </div>
-          <button id="emp2Refresh" class="tasks-refresh">Обновить</button>
-        </div>
+        <div class="employee-v2-hero"><div><p class="label">BK8 Staff</p><h2>👥 Сотрудники</h2></div><button id="emp2Refresh" class="tasks-refresh">Обновить</button></div>
         <div class="employee-v2-layout">
           <div class="employee-v2-form">
             <h3 id="emp2FormTitle">Новый сотрудник</h3>
@@ -47,18 +51,10 @@ function emp2Build() {
             <input id="emp2Phone" placeholder="Телефон" />
             <input id="emp2Birth" type="date" />
             <input id="emp2Timesheet" placeholder="Имя в табеле, если отличается" />
-            <div class="admin-actions">
-              <button id="emp2Create" class="action-btn add">Создать код</button>
-              <button id="emp2Save" class="action-btn add" hidden>Сохранить</button>
-              <button id="emp2Cancel" class="action-btn remove" hidden>Отмена</button>
-            </div>
+            <div class="admin-actions"><button id="emp2Create" class="action-btn add">Создать код</button><button id="emp2Save" class="action-btn add" hidden>Сохранить</button><button id="emp2Cancel" class="action-btn remove" hidden>Отмена</button></div>
             <p id="emp2Status" class="employee-status"></p>
           </div>
-          <div class="employee-v2-list-wrap">
-            <input id="emp2Search" class="employee-v2-search" placeholder="Поиск" />
-            <div id="emp2Stats" class="klokr-result-preview"></div>
-            <div id="emp2List" class="employee-v2-list"></div>
-          </div>
+          <div class="employee-v2-list-wrap"><input id="emp2Search" class="employee-v2-search" placeholder="Поиск" /><div id="emp2Stats" class="klokr-result-preview"></div><div id="emp2List" class="employee-v2-list"></div></div>
         </div>
         <div id="emp2Details"></div>
       </article>
@@ -126,7 +122,8 @@ async function emp2Create() {
     emp2Cancel();
     await emp2Load();
   } catch (e) {
-    status.textContent = "Не получилось создать код.";
+    console.error(e);
+    status.innerHTML = `Ошибка: ${emp2Escape(emp2ErrorText(e))}`;
   }
 }
 
@@ -140,13 +137,14 @@ async function emp2Save() {
     await emp2Load();
     if (typeof renderApp === "function") await renderApp();
   } catch (e) {
-    status.textContent = "Не получилось сохранить.";
+    console.error(e);
+    status.innerHTML = `Ошибка: ${emp2Escape(emp2ErrorText(e))}`;
   }
 }
 
 async function emp2Archive(id) {
   if (!confirm("Архивировать сотрудника?")) return;
-  await supabaseWrite(`employee_profiles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ activation_status: EMP_ARCHIVED, updated_at: new Date().toISOString() }) });
+  await supabaseWrite(`employee_profiles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return:minimal" }, body: JSON.stringify({ activation_status: EMP_ARCHIVED, updated_at: new Date().toISOString() }) });
   await emp2Load();
 }
 
@@ -171,36 +169,21 @@ function emp2RenderDetails() {
   const root = document.getElementById("emp2Details");
   if (!root) return;
   const row = emp2State.rows.find(item => Number(item.id) === Number(emp2State.openedId));
-  if (!row) {
-    root.innerHTML = "";
-    return;
-  }
+  if (!row) { root.innerHTML = ""; return; }
   const name = row.full_name === "Ожидает регистрации" ? "Ожидает ФИО" : row.full_name;
   root.innerHTML = `
     <article class="employee-admin-card">
-      <div class="employee-admin-head">
-        <div class="employee-v2-avatar big">${emp2Escape(initials(name || "BK"))}</div>
-        <div>
-          <p class="label">Карточка</p>
-          <h3>${emp2Escape(name || "Сотрудник")}</h3>
-          <span>${emp2Escape(row.position || "Должность не указана")}</span>
-        </div>
-      </div>
+      <div class="employee-admin-head"><div class="employee-v2-avatar big">${emp2Escape(initials(name || "BK"))}</div><div><p class="label">Карточка</p><h3>${emp2Escape(name || "Сотрудник")}</h3><span>${emp2Escape(row.position || "Должность не указана")}</span></div></div>
       <div class="employee-admin-grid">
         <button onclick="emp2Fill(emp2State.rows.find(r=>r.id===${Number(row.id)}))">👤 Профиль</button>
-        <button>🩺 Санитарные документы</button>
-        <button>📄 Бланк постоянных временных возможностей</button>
+        <button>🩺 Сан справка</button>
+        <button>📄 Бланк ПВВ</button>
         <button>🕒 Табель</button>
         <button>🏆 КЛОКР</button>
         <button>🛒 Покупки</button>
         <button>⚙️ Настройки</button>
       </div>
-      <div class="profile-info-grid">
-        <div><span>Телефон</span><strong>${emp2Escape(row.phone || "—")}</strong></div>
-        <div><span>Дата рождения</span><strong>${emp2Escape(row.birth_date || "—")}</strong></div>
-        <div><span>Telegram</span><strong>${emp2Escape(row.telegram_id || "не привязан")}</strong></div>
-        <div><span>Код</span><strong>${emp2Escape(row.activation_code || "—")}</strong></div>
-      </div>
+      <div class="profile-info-grid"><div><span>Телефон</span><strong>${emp2Escape(row.phone || "—")}</strong></div><div><span>Дата рождения</span><strong>${emp2Escape(row.birth_date || "—")}</strong></div><div><span>Telegram</span><strong>${emp2Escape(row.telegram_id || "не привязан")}</strong></div><div><span>Код</span><strong>${emp2Escape(row.activation_code || "—")}</strong></div></div>
     </article>
   `;
 }
@@ -219,20 +202,7 @@ function emp2Render() {
     const isActive = row.activation_status === EMP_ACTIVE;
     const isArchived = row.activation_status === EMP_ARCHIVED;
     const name = isActive ? row.full_name : (row.full_name === "Ожидает регистрации" ? "Ожидает ФИО" : row.full_name);
-    return `<article class="employee-v2-card ${isArchived ? "is-archived" : ""}">
-      <div class="employee-v2-avatar">${emp2Escape(initials(name || "BK"))}</div>
-      <div class="employee-v2-main" onclick="emp2Open(${Number(row.id)})">
-        <strong>${emp2Escape(name || "Сотрудник")}</strong>
-        <span>${emp2Escape(row.position || "Должность не указана")}</span>
-        <small>${isActive ? "активирован" : isArchived ? "архив" : "ожидает регистрации"}${row.telegram_id ? " · TG " + emp2Escape(row.telegram_id) : ""}</small>
-      </div>
-      <div class="employee-v2-actions">
-        <code>${emp2Escape(row.activation_code || "—")}</code>
-        <button class="tasks-refresh" onclick="emp2Open(${Number(row.id)})">Открыть</button>
-        <button class="tasks-refresh" onclick="emp2Copy('${emp2Escape(row.activation_code || "")}')">Копировать</button>
-        ${isArchived ? "" : `<button class="task-delete-icon" onclick="emp2Archive(${Number(row.id)})">×</button>`}
-      </div>
-    </article>`;
+    return `<article class="employee-v2-card ${isArchived ? "is-archived" : ""}"><div class="employee-v2-avatar">${emp2Escape(initials(name || "BK"))}</div><div class="employee-v2-main" onclick="emp2Open(${Number(row.id)})"><strong>${emp2Escape(name || "Сотрудник")}</strong><span>${emp2Escape(row.position || "Должность не указана")}</span><small>${isActive ? "активирован" : isArchived ? "архив" : "ожидает регистрации"}${row.telegram_id ? " · TG " + emp2Escape(row.telegram_id) : ""}</small></div><div class="employee-v2-actions"><code>${emp2Escape(row.activation_code || "—")}</code><button class="tasks-refresh" onclick="emp2Open(${Number(row.id)})">Открыть</button><button class="tasks-refresh" onclick="emp2Copy('${emp2Escape(row.activation_code || "")}')">Копировать</button>${isArchived ? "" : `<button class="task-delete-icon" onclick="emp2Archive(${Number(row.id)})">×</button>`}</div></article>`;
   }).join("") || `<div class="shop-empty-card"><strong>Сотрудников пока нет</strong><span>Создай первый код регистрации.</span></div>`;
   emp2RenderDetails();
 }
