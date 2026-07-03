@@ -39,7 +39,7 @@ function loadStyleOnce(href) {
 function loadEmployeeRegistrationScripts() {
   if (window.__employeeScriptsLoading) return;
   window.__employeeScriptsLoading = true;
-  const scripts = ["employee-core.js?v=2", "employee-activate.js?v=2", "employee-admin.js?v=2", "employee-loader.js?v=2"];
+  const scripts = ["employee-core.js?v=3", "employee-activate.js?v=3", "employee-admin.js?v=3", "employee-loader.js?v=3"];
   let chain = Promise.resolve();
   scripts.forEach(src => chain = chain.then(() => loadScriptOnce(src)));
 }
@@ -53,8 +53,8 @@ function loadEmployeesSection() {
 }
 
 function loadMyProfileSection() {
-  loadStyleOnce("my-profile.css?v=2");
-  loadScriptOnce("my-profile.js?v=2").then(() => {
+  loadStyleOnce("my-profile.css?v=3");
+  loadScriptOnce("my-profile.js?v=3").then(() => {
     if (typeof myProfileLoad === "function") myProfileLoad();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
