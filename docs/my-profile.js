@@ -93,7 +93,7 @@ function myProfileRender() {
       <div class="profile-title">
         <p class="label">Личный кабинет</p>
         <h2>${myProfileEscape(profile.full_name || "Сотрудник")}</h2>
-        <span>${myProfileEscape(profile.position || "Должность не указана")} · ${myProfileEscape(profile.restaurant || "Ресторан не указан")}</span>
+        <span>${myProfileEscape(profile.position || "Должность не указана")}</span>
       </div>
       <div class="profile-status">${profile.activation_status === "active" ? "🟢 Активен" : "🟡 " + myProfileEscape(profile.activation_status || "ожидает")}</div>
     </div>
@@ -107,13 +107,11 @@ function myProfileRender() {
 
     <div class="profile-info-grid">
       <div><span>ФИО</span><strong>${myProfileEscape(profile.full_name || "—")}</strong></div>
+      <div><span>Должность</span><strong>${myProfileEscape(profile.position || "—")}</strong></div>
       <div><span>Телефон</span><strong>${myProfileEscape(profile.phone || "—")}</strong></div>
       <div><span>Дата рождения</span><strong>${myProfileEscape(profile.birth_date || "—")}</strong></div>
-      <div><span>Ресторан</span><strong>${myProfileEscape(profile.restaurant || "—")}</strong></div>
-      <div><span>Должность</span><strong>${myProfileEscape(profile.position || "—")}</strong></div>
       <div><span>Telegram ID</span><strong>${myProfileEscape(profile.telegram_id || myProfileUserId() || "—")}</strong></div>
       <div><span>Дата регистрации</span><strong>${profile.activated_at ? new Date(profile.activated_at).toLocaleDateString("ru-RU") : "—"}</strong></div>
-      <div><span>Код</span><strong>${myProfileEscape(profile.activation_code || "—")}</strong></div>
     </div>
 
     <div class="profile-roadmap">
