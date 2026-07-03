@@ -3,6 +3,9 @@ import re
 from pathlib import Path
 
 import openpyxl
+import supabase_storage as db
+
+CURRENT_PERIOD = "current"
 
 
 def normalize_name(value: str) -> str:
@@ -34,8 +37,7 @@ def name_parts(value: str):
 
 def profile_matches_row(profile, row_text: str) -> bool:
     row = normalize_name(row_text)
-    names = [profile.get("timesheet_name"), profile.get("full_name")]
-    for name in names:
+    for name in [profile.get("timesheet_name"), profile.get("full_name")]:
         parts = name_parts(name)
         if len(parts) >= 2 and all(part in row for part in parts[:2]):
             return True
@@ -70,8 +72,25 @@ def find_columns(rows):
                 hours_col = index
         if employee_col is not None and hours_col is not None:
             return employee_col, hours_col
-    # fallback for your current CHBR table: D = employee, F = worked hours
     return 3, 5
+
+
+def save_current(result):
+    if not result:
+        return
+    payload = []
+    for item in result:
+        payload.append({
+            "employee_profile_id": item["profile_id"],
+            "telegram_id": item.get("telegram_id"),
+            "period": CURRENT_PERIOD,
+            "hours": item["hours"],
+            "updated_at": db.now(),
+        })
+    try:
+        db.request("POST", "employee_timesheets?on_conflict=employee_profile_id,period", headers=db.headers("resolution=merge-duplicates,return=minimal"), json=payload)
+    except Exception as error:
+        print(f"Timesheet save skipped: {error}")
 
 
 def parse_timesheet(path: Path, profiles):
@@ -90,10 +109,9 @@ def parse_timesheet(path: Path, profiles):
         if "worked at night" in employee_norm or "итого" in employee_norm:
             continue
 
-        row_text = employee_cell
         matched_profile = None
         for profile in profiles:
-            if profile_matches_row(profile, row_text):
+            if profile_matches_row(profile, employee_cell):
                 matched_profile = profile
                 break
         if not matched_profile:
@@ -116,7 +134,9 @@ def parse_timesheet(path: Path, profiles):
             "matched_rows": 1,
         })
 
-    return sorted(result, key=lambda item: item["full_name"])
+    result = sorted(result, key=lambda item: item["full_name"])
+    save_current(result)
+    return result
 
 
 def format_hours(value: float) -> str:
