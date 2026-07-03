@@ -9,23 +9,11 @@ function emp2Escape(value) {
 
 function emp2ErrorText(error) {
   const text = String(error?.message || error || "Неизвестная ошибка");
-  try {
-    const parsed = JSON.parse(text);
-    return parsed.message || parsed.details || parsed.hint || text;
-  } catch (_) {
-    return text;
-  }
+  try { const parsed = JSON.parse(text); return parsed.message || parsed.details || parsed.hint || text; } catch (_) { return text; }
 }
 
-function emp2Code() {
-  return "BK8-" + Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
-}
-
-function emp2IsRoot() {
-  const tg = window.Telegram?.WebApp?.initDataUnsafe?.user;
-  const id = String(tg?.id || window.userId || (typeof userId !== "undefined" ? userId : ""));
-  return id === "818748106";
-}
+function emp2Code() { return "BK8-" + Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase(); }
+function emp2IsRoot() { const tg = window.Telegram?.WebApp?.initDataUnsafe?.user; const id = String(tg?.id || window.userId || (typeof userId !== "undefined" ? userId : "")); return id === "818748106"; }
 
 function emp2Build() {
   if (!emp2IsRoot()) return;
@@ -39,27 +27,7 @@ function emp2Build() {
     tabs.querySelector('[data-tab="employees"]').onclick = () => switchTab("employees");
   }
   if (document.getElementById("tab-employees")) return;
-  app.insertAdjacentHTML("beforeend", `
-    <section class="tab-page" id="tab-employees">
-      <article class="card employee-v2-panel">
-        <div class="employee-v2-hero"><div><p class="label">BK8 Staff</p><h2>👥 Сотрудники</h2></div><button id="emp2Refresh" class="tasks-refresh">Обновить</button></div>
-        <div class="employee-v2-layout">
-          <div class="employee-v2-form">
-            <h3 id="emp2FormTitle">Новый сотрудник</h3>
-            <input id="emp2FullName" placeholder="ФИО" />
-            <input id="emp2Position" placeholder="Должность" />
-            <input id="emp2Phone" placeholder="Телефон" />
-            <input id="emp2Birth" type="date" />
-            <input id="emp2Timesheet" placeholder="Имя в табеле, если отличается" />
-            <div class="admin-actions"><button id="emp2Create" class="action-btn add">Создать код</button><button id="emp2Save" class="action-btn add" hidden>Сохранить</button><button id="emp2Cancel" class="action-btn remove" hidden>Отмена</button></div>
-            <p id="emp2Status" class="employee-status"></p>
-          </div>
-          <div class="employee-v2-list-wrap"><input id="emp2Search" class="employee-v2-search" placeholder="Поиск" /><div id="emp2Stats" class="klokr-result-preview"></div><div id="emp2List" class="employee-v2-list"></div></div>
-        </div>
-        <div id="emp2Details"></div>
-      </article>
-    </section>
-  `);
+  app.insertAdjacentHTML("beforeend", `<section class="tab-page" id="tab-employees"><article class="card employee-v2-panel"><div class="employee-v2-hero"><div><p class="label">BK8 Staff</p><h2>👥 Сотрудники</h2></div><button id="emp2Refresh" class="tasks-refresh">Обновить</button></div><div class="employee-v2-layout"><div class="employee-v2-form"><h3 id="emp2FormTitle">Новый сотрудник</h3><input id="emp2FullName" placeholder="ФИО" /><input id="emp2Position" placeholder="Должность" /><input id="emp2Phone" placeholder="Телефон" /><input id="emp2Birth" type="date" /><input id="emp2Timesheet" placeholder="Имя в табеле, если отличается" /><div class="admin-actions"><button id="emp2Create" class="action-btn add">Создать код</button><button id="emp2Save" class="action-btn add" hidden>Сохранить</button><button id="emp2Cancel" class="action-btn remove" hidden>Отмена</button></div><p id="emp2Status" class="employee-status"></p></div><div class="employee-v2-list-wrap"><input id="emp2Search" class="employee-v2-search" placeholder="Поиск" /><div id="emp2Stats" class="klokr-result-preview"></div><div id="emp2List" class="employee-v2-list"></div></div></div><div id="emp2Details"></div></article></section>`);
   emp2Bind();
 }
 
@@ -68,23 +36,12 @@ function emp2Bind() {
   document.getElementById("emp2Create").onclick = emp2Create;
   document.getElementById("emp2Save").onclick = emp2Save;
   document.getElementById("emp2Cancel").onclick = emp2Cancel;
-  document.getElementById("emp2Search").oninput = event => {
-    emp2State.query = event.target.value.toLowerCase();
-    emp2Render();
-  };
+  document.getElementById("emp2Search").oninput = event => { emp2State.query = event.target.value.toLowerCase(); emp2Render(); };
 }
 
 function emp2Values() {
   const name = document.getElementById("emp2FullName").value.trim().replace(/\s+/g, " ");
-  return {
-    full_name: name || "Ожидает регистрации",
-    position: document.getElementById("emp2Position").value.trim(),
-    restaurant: "",
-    phone: document.getElementById("emp2Phone").value.trim(),
-    birth_date: document.getElementById("emp2Birth").value || null,
-    timesheet_name: document.getElementById("emp2Timesheet").value.trim(),
-    updated_at: new Date().toISOString(),
-  };
+  return { full_name: name || "Ожидает регистрации", position: document.getElementById("emp2Position").value.trim(), restaurant: "", phone: document.getElementById("emp2Phone").value.trim(), birth_date: document.getElementById("emp2Birth").value || null, timesheet_name: document.getElementById("emp2Timesheet").value.trim(), updated_at: new Date().toISOString() };
 }
 
 function emp2Fill(row) {
@@ -116,53 +73,33 @@ async function emp2Create() {
   data.activation_status = EMP_PENDING;
   data.created_by = Number(window.Telegram?.WebApp?.initDataUnsafe?.user?.id || window.userId || 818748106);
   data.created_at = new Date().toISOString();
-  try {
-    await supabaseWrite("employee_profiles", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(data) });
-    status.innerHTML = `Код создан: <b>${emp2Escape(data.activation_code)}</b>`;
-    emp2Cancel();
-    await emp2Load();
-  } catch (e) {
-    console.error(e);
-    status.innerHTML = `Ошибка: ${emp2Escape(emp2ErrorText(e))}`;
-  }
+  try { await supabaseWrite("employee_profiles", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(data) }); status.innerHTML = `Код создан: <b>${emp2Escape(data.activation_code)}</b>`; emp2Cancel(); await emp2Load(); }
+  catch (e) { console.error(e); status.innerHTML = `Ошибка: ${emp2Escape(emp2ErrorText(e))}`; }
 }
 
 async function emp2Save() {
   const status = document.getElementById("emp2Status");
   if (!emp2State.editingId) return;
+  try { await supabaseWrite(`employee_profiles?id=eq.${emp2State.editingId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(emp2Values()) }); status.textContent = "Сохранено."; emp2Cancel(); await emp2Load(); if (typeof renderApp === "function") await renderApp(); }
+  catch (e) { console.error(e); status.innerHTML = `Ошибка: ${emp2Escape(emp2ErrorText(e))}`; }
+}
+
+async function emp2Archive(id) { if (!confirm("Архивировать сотрудника?")) return; await supabaseWrite(`employee_profiles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return:minimal" }, body: JSON.stringify({ activation_status: EMP_ARCHIVED, updated_at: new Date().toISOString() }) }); await emp2Load(); }
+function emp2Copy(code) { navigator.clipboard?.writeText(code); document.getElementById("emp2Status").textContent = "Код скопирован: " + code; }
+function emp2Open(id) { emp2State.openedId = Number(id); emp2RenderDetails(); document.getElementById("emp2Details")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+function emp2Filtered() { const q = emp2State.query; if (!q) return emp2State.rows; return emp2State.rows.filter(row => [row.full_name, row.position, row.phone, row.activation_code].join(" ").toLowerCase().includes(q)); }
+
+async function emp2ShowTimesheet(profileId) {
+  const root = document.getElementById("emp2Subpanel");
+  if (!root) return;
+  root.innerHTML = `<div class="shop-empty-card"><strong>Табель</strong><span>Загружаю часы...</span></div>`;
   try {
-    await supabaseWrite(`employee_profiles?id=eq.${emp2State.editingId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(emp2Values()) });
-    status.textContent = "Сохранено.";
-    emp2Cancel();
-    await emp2Load();
-    if (typeof renderApp === "function") await renderApp();
+    const rows = await supabaseFetch(`employee_timesheets?employee_profile_id=eq.${Number(profileId)}&select=period,hours,source_file,updated_at&order=period.desc&limit=24`);
+    if (!rows?.length) { root.innerHTML = `<div class="shop-empty-card"><strong>Табель</strong><span>Пока нет загруженных часов.</span></div>`; return; }
+    root.innerHTML = `<div class="employee-admin-subcard"><h3>🕒 Табель</h3><div class="employee-v2-list">${rows.map(row => `<div class="employee-row"><div><strong>${emp2Escape(row.period || "—")}</strong><span>${emp2Escape(row.source_file || "")}</span></div><code>${Number(row.hours || 0).toString().replace('.', ',')} ч.</code></div>`).join("")}</div></div>`;
   } catch (e) {
-    console.error(e);
-    status.innerHTML = `Ошибка: ${emp2Escape(emp2ErrorText(e))}`;
+    root.innerHTML = `<div class="shop-empty-card"><strong>Табель</strong><span>Нет таблицы employee_timesheets. Запусти SQL из docs/employee-timesheets.sql</span></div>`;
   }
-}
-
-async function emp2Archive(id) {
-  if (!confirm("Архивировать сотрудника?")) return;
-  await supabaseWrite(`employee_profiles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return:minimal" }, body: JSON.stringify({ activation_status: EMP_ARCHIVED, updated_at: new Date().toISOString() }) });
-  await emp2Load();
-}
-
-function emp2Copy(code) {
-  navigator.clipboard?.writeText(code);
-  document.getElementById("emp2Status").textContent = "Код скопирован: " + code;
-}
-
-function emp2Open(id) {
-  emp2State.openedId = Number(id);
-  emp2RenderDetails();
-  document.getElementById("emp2Details")?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function emp2Filtered() {
-  const q = emp2State.query;
-  if (!q) return emp2State.rows;
-  return emp2State.rows.filter(row => [row.full_name, row.position, row.phone, row.activation_code].join(" ").toLowerCase().includes(q));
 }
 
 function emp2RenderDetails() {
@@ -171,21 +108,7 @@ function emp2RenderDetails() {
   const row = emp2State.rows.find(item => Number(item.id) === Number(emp2State.openedId));
   if (!row) { root.innerHTML = ""; return; }
   const name = row.full_name === "Ожидает регистрации" ? "Ожидает ФИО" : row.full_name;
-  root.innerHTML = `
-    <article class="employee-admin-card">
-      <div class="employee-admin-head"><div class="employee-v2-avatar big">${emp2Escape(initials(name || "BK"))}</div><div><p class="label">Карточка</p><h3>${emp2Escape(name || "Сотрудник")}</h3><span>${emp2Escape(row.position || "Должность не указана")}</span></div></div>
-      <div class="employee-admin-grid">
-        <button onclick="emp2Fill(emp2State.rows.find(r=>r.id===${Number(row.id)}))">👤 Профиль</button>
-        <button>🩺 Сан справка</button>
-        <button>📄 Бланк ПВВ</button>
-        <button>🕒 Табель</button>
-        <button>🏆 КЛОКР</button>
-        <button>🛒 Покупки</button>
-        <button>⚙️ Настройки</button>
-      </div>
-      <div class="profile-info-grid"><div><span>Телефон</span><strong>${emp2Escape(row.phone || "—")}</strong></div><div><span>Дата рождения</span><strong>${emp2Escape(row.birth_date || "—")}</strong></div><div><span>Telegram</span><strong>${emp2Escape(row.telegram_id || "не привязан")}</strong></div><div><span>Код</span><strong>${emp2Escape(row.activation_code || "—")}</strong></div></div>
-    </article>
-  `;
+  root.innerHTML = `<article class="employee-admin-card"><div class="employee-admin-head"><div class="employee-v2-avatar big">${emp2Escape(initials(name || "BK"))}</div><div><p class="label">Карточка</p><h3>${emp2Escape(name || "Сотрудник")}</h3><span>${emp2Escape(row.position || "Должность не указана")}</span></div></div><div class="employee-admin-grid"><button onclick="emp2Fill(emp2State.rows.find(r=>r.id===${Number(row.id)}))">👤 Профиль</button><button>🩺 Сан справка</button><button>📄 Бланк ПВВ</button><button onclick="emp2ShowTimesheet(${Number(row.id)})">🕒 Табель</button><button>🏆 КЛОКР</button><button>🛒 Покупки</button><button>⚙️ Настройки</button></div><div class="profile-info-grid"><div><span>Телефон</span><strong>${emp2Escape(row.phone || "—")}</strong></div><div><span>Дата рождения</span><strong>${emp2Escape(row.birth_date || "—")}</strong></div><div><span>Telegram</span><strong>${emp2Escape(row.telegram_id || "не привязан")}</strong></div><div><span>Код</span><strong>${emp2Escape(row.activation_code || "—")}</strong></div></div><div id="emp2Subpanel"></div></article>`;
 }
 
 function emp2Render() {
@@ -198,22 +121,11 @@ function emp2Render() {
   const pending = rows.filter(r => r.activation_status === EMP_PENDING).length;
   const archived = rows.filter(r => r.activation_status === EMP_ARCHIVED).length;
   stats.innerHTML = `<div><span>Всего</span><strong>${rows.length}</strong></div><div><span>Активны</span><strong>${active}</strong></div><div><span>Ожидают</span><strong>${pending}</strong></div><div><span>Архив</span><strong>${archived}</strong></div>`;
-  root.innerHTML = emp2Filtered().map(row => {
-    const isActive = row.activation_status === EMP_ACTIVE;
-    const isArchived = row.activation_status === EMP_ARCHIVED;
-    const name = isActive ? row.full_name : (row.full_name === "Ожидает регистрации" ? "Ожидает ФИО" : row.full_name);
-    return `<article class="employee-v2-card ${isArchived ? "is-archived" : ""}"><div class="employee-v2-avatar">${emp2Escape(initials(name || "BK"))}</div><div class="employee-v2-main" onclick="emp2Open(${Number(row.id)})"><strong>${emp2Escape(name || "Сотрудник")}</strong><span>${emp2Escape(row.position || "Должность не указана")}</span><small>${isActive ? "активирован" : isArchived ? "архив" : "ожидает регистрации"}${row.telegram_id ? " · TG " + emp2Escape(row.telegram_id) : ""}</small></div><div class="employee-v2-actions"><code>${emp2Escape(row.activation_code || "—")}</code><button class="tasks-refresh" onclick="emp2Open(${Number(row.id)})">Открыть</button><button class="tasks-refresh" onclick="emp2Copy('${emp2Escape(row.activation_code || "")}')">Копировать</button>${isArchived ? "" : `<button class="task-delete-icon" onclick="emp2Archive(${Number(row.id)})">×</button>`}</div></article>`;
-  }).join("") || `<div class="shop-empty-card"><strong>Сотрудников пока нет</strong><span>Создай первый код регистрации.</span></div>`;
+  root.innerHTML = emp2Filtered().map(row => { const isActive = row.activation_status === EMP_ACTIVE; const isArchived = row.activation_status === EMP_ARCHIVED; const name = isActive ? row.full_name : (row.full_name === "Ожидает регистрации" ? "Ожидает ФИО" : row.full_name); return `<article class="employee-v2-card ${isArchived ? "is-archived" : ""}"><div class="employee-v2-avatar">${emp2Escape(initials(name || "BK"))}</div><div class="employee-v2-main" onclick="emp2Open(${Number(row.id)})"><strong>${emp2Escape(name || "Сотрудник")}</strong><span>${emp2Escape(row.position || "Должность не указана")}</span><small>${isActive ? "активирован" : isArchived ? "архив" : "ожидает регистрации"}${row.telegram_id ? " · TG " + emp2Escape(row.telegram_id) : ""}</small></div><div class="employee-v2-actions"><code>${emp2Escape(row.activation_code || "—")}</code><button class="tasks-refresh" onclick="emp2Open(${Number(row.id)})">Открыть</button><button class="tasks-refresh" onclick="emp2Copy('${emp2Escape(row.activation_code || "")}')">Копировать</button>${isArchived ? "" : `<button class="task-delete-icon" onclick="emp2Archive(${Number(row.id)})">×</button>`}</div></article>`; }).join("") || `<div class="shop-empty-card"><strong>Сотрудников пока нет</strong><span>Создай первый код регистрации.</span></div>`;
   emp2RenderDetails();
 }
 
-async function emp2Load() {
-  if (!emp2IsRoot()) return;
-  emp2Build();
-  emp2State.rows = await supabaseFetch("employee_profiles?select=*&order=created_at.desc&limit=300").catch(() => []);
-  emp2Render();
-}
-
+async function emp2Load() { if (!emp2IsRoot()) return; emp2Build(); emp2State.rows = await supabaseFetch("employee_profiles?select=*&order=created_at.desc&limit=300").catch(() => []); emp2Render(); }
 setTimeout(emp2Load, 800);
 setTimeout(emp2Load, 2000);
 setInterval(emp2Load, 30000);
