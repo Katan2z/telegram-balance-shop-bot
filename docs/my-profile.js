@@ -5,6 +5,10 @@ function myProfileUserId() {
   return tgUser?.id ? String(tgUser.id) : "";
 }
 
+function myProfileIsRoot() {
+  return myProfileUserId() === "818748106";
+}
+
 function myProfileEscape(value) {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
@@ -21,15 +25,16 @@ function myProfileConfig() {
   return { url: String(config.SUPABASE_URL || "").replace(/\/$/, ""), key: config.SUPABASE_ANON_KEY || "" };
 }
 
-async function myProfileFetch(path) {
+async function myProfileFetch(path, options = {}) {
   const config = myProfileConfig();
   if (!config.url || !config.key) throw new Error("Supabase config missing");
   const response = await fetch(`${config.url}/rest/v1/${path}`, {
     cache: "no-store",
-    headers: { apikey: config.key, Authorization: `Bearer ${config.key}` },
+    headers: { apikey: config.key, Authorization: `Bearer ${config.key}`, ...(options.headers || {}) },
+    ...options,
   });
   if (!response.ok) throw new Error(await response.text());
-  return response.json();
+  return response.text().then(text => text ? JSON.parse(text) : null);
 }
 
 function myProfileHoursText(value) {
@@ -67,6 +72,28 @@ function myProfileAddHomeCard() {
   }
 }
 
+async function myProfileCreateAdminProfile() {
+  const nameInput = document.getElementById("myProfileAdminName");
+  const status = document.getElementById("myProfileAdminStatus");
+  const fullName = String(nameInput?.value || "").trim().replace(/\s+/g, " ");
+  if (!fullName || fullName.split(/\s+/).length < 2) {
+    if (status) status.textContent = "Введи ФИО полностью.";
+    return;
+  }
+  const id = myProfileUserId();
+  try {
+    await myProfileFetch("employee_profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ telegram_id: Number(id), full_name: fullName, position: "Админ", activation_status: "active", activation_code: "ADMIN-818748106", created_by: Number(id), created_at: new Date().toISOString(), activated_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+    });
+    if (status) status.textContent = "Профиль создан.";
+    await myProfileLoad();
+  } catch (e) {
+    if (status) status.textContent = "Не получилось создать профиль.";
+  }
+}
+
 function myProfileShowHours() {
   const root = document.getElementById("profileActionContent");
   if (!root) return;
@@ -89,48 +116,27 @@ function myProfileRender() {
   const hours = myProfileState.timesheet ? myProfileHoursText(myProfileState.timesheet.hours) : "—";
 
   if (!profile) {
-    root.innerHTML = `<div class="profile-hero empty"><div class="profile-avatar">BK</div><div><p class="label">BK8 Staff</p><h2>Профиль не активирован</h2><p>Зарегистрируйся по коду приглашения.</p></div></div>`;
+    root.innerHTML = myProfileIsRoot()
+      ? `<div class="profile-hero empty"><div class="profile-avatar">AD</div><div><p class="label">BK8 Staff</p><h2>Создай свой профиль</h2><p>Админ-доступ есть, но карточки сотрудника ещё нет.</p></div></div><div class="profile-action-card"><input id="myProfileAdminName" placeholder="Твоё ФИО" /><button class="action-btn add" onclick="myProfileCreateAdminProfile()">Создать мой профиль</button><p id="myProfileAdminStatus" class="employee-status"></p></div>`
+      : `<div class="profile-hero empty"><div class="profile-avatar">BK</div><div><p class="label">BK8 Staff</p><h2>Профиль не активирован</h2><p>Зарегистрируйся по коду приглашения.</p></div></div>`;
     return;
   }
 
   root.innerHTML = `
     <div class="profile-hero">
       <div class="profile-avatar">${myProfileEscape(myProfileInitials(profile.full_name))}</div>
-      <div class="profile-title">
-        <p class="label">Мой профиль</p>
-        <h2>${myProfileEscape(profile.full_name || "Сотрудник")}</h2>
-        <span>${myProfileEscape(profile.position || "Должность не указана")}</span>
-      </div>
+      <div class="profile-title"><p class="label">Мой профиль</p><h2>${myProfileEscape(profile.full_name || "Сотрудник")}</h2><span>${myProfileEscape(profile.position || "Должность не указана")}</span></div>
     </div>
-
-    <div class="profile-stat-grid">
-      <div><span>Спасибки</span><strong>${balance}</strong></div>
-      <div><span>Монетки</span><strong>${coins}</strong></div>
-      <div><span>КЛОКР</span><strong>—</strong></div>
-      <div><span>Часы</span><strong>${myProfileEscape(hours)}</strong></div>
-    </div>
-
-    <div class="profile-roadmap employee-only">
-      <div class="profile-roadmap-grid">
-        <div>⭐ Спасибки</div>
-        <div>🪙 Монетки</div>
-        <div>🏆 КЛОКР</div>
-        <button type="button" onclick="myProfileShowHours()">🕒 Часы</button>
-        <div>🛒 Покупки</div>
-      </div>
-    </div>
-    <div id="profileActionContent"></div>
-  `;
+    <div class="profile-stat-grid"><div><span>Спасибки</span><strong>${balance}</strong></div><div><span>Монетки</span><strong>${coins}</strong></div><div><span>КЛОКР</span><strong>—</strong></div><div><span>Часы</span><strong>${myProfileEscape(hours)}</strong></div></div>
+    <div class="profile-roadmap employee-only"><div class="profile-roadmap-grid"><div>⭐ Спасибки</div><div>🪙 Монетки</div><div>🏆 КЛОКР</div><button type="button" onclick="myProfileShowHours()">🕒 Часы</button><div>🛒 Покупки</div></div></div>
+    <div id="profileActionContent"></div>`;
 }
 
 async function myProfileLoad() {
   const id = myProfileUserId();
   myProfileBuildSection();
   myProfileAddHomeCard();
-  if (!id) {
-    myProfileRender();
-    return;
-  }
+  if (!id) { myProfileRender(); return; }
   const [profiles, users] = await Promise.all([
     myProfileFetch(`employee_profiles?telegram_id=eq.${encodeURIComponent(id)}&select=*&limit=1`).catch(() => []),
     myProfileFetch(`users?telegram_id=eq.${encodeURIComponent(id)}&select=telegram_id,balance,coins&limit=1`).catch(() => []),
