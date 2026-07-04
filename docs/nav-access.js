@@ -56,6 +56,7 @@ function loadEmployeesSection() {
 function loadMyProfileSection() {
   loadStyleOnce("my-profile.css?v=4");
   loadScriptOnce("my-profile.js?v=5").then(() => {
+    loadScriptOnce("my-profile-hours-fix.js?v=1");
     if (typeof myProfileLoad === "function") myProfileLoad();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
