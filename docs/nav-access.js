@@ -54,9 +54,10 @@ function loadEmployeesSection() {
 }
 
 function loadMyProfileSection() {
-  loadStyleOnce("my-profile.css?v=4");
+  loadStyleOnce("my-profile.css?v=5");
   loadScriptOnce("my-profile.js?v=5").then(() => {
     loadScriptOnce("my-profile-hours-fix.js?v=1");
+    loadScriptOnce("my-profile-hours-view.js?v=1");
     if (typeof myProfileLoad === "function") myProfileLoad();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
