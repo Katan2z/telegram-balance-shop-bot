@@ -13,8 +13,16 @@
       .replaceAll("'", "&#039;");
   }
 
+  function employeeState() {
+    try {
+      if (typeof emp2State !== "undefined") return emp2State;
+    } catch (_) {}
+    return window.emp2State || null;
+  }
+
   function selectedEmployee() {
-    return window.emp2State?.rows?.find(item => Number(item.id) === Number(window.emp2State?.openedId)) || null;
+    const state = employeeState();
+    return state?.rows?.find(item => Number(item.id) === Number(state.openedId)) || null;
   }
 
   function subpanel() {
@@ -36,7 +44,7 @@
   };
 
   window.emp2ShowMedical = function emp2ShowMedical() {
-    showPlaceholder("🩺", "Сан справка", "Следующим шагом добавим даты санитарной справки, санминимума и флюорографии.");
+    showPlaceholder("🩺", "Сан справка", "Здесь будут даты санитарной справки, санминимума и флюорографии.");
   };
 
   window.emp2ShowPvv = function emp2ShowPvv() {
@@ -76,12 +84,13 @@
   };
 
   window.emp2DeleteEmployee = async function emp2DeleteEmployee(id) {
+    const state = employeeState();
     const row = selectedEmployee();
     const name = row?.full_name || "сотрудника";
     if (!confirm(`Удалить ${name}? Это действие нельзя отменить.`)) return;
     try {
       await supabaseWrite(`employee_profiles?id=eq.${Number(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-      window.emp2State.openedId = null;
+      if (state) state.openedId = null;
       if (typeof emp2Load === "function") await emp2Load();
     } catch (error) {
       const root = subpanel();
@@ -126,7 +135,13 @@
     </article>`;
   };
 
-  setTimeout(() => {
-    if (window.emp2State?.openedId && typeof window.emp2RenderDetails === "function") window.emp2RenderDetails();
-  }, 500);
+  function rerenderOpenedEmployee() {
+    const state = employeeState();
+    if (state?.openedId && typeof window.emp2RenderDetails === "function") {
+      window.emp2RenderDetails();
+    }
+  }
+
+  window.addEventListener("bk8:employee-state-ready", rerenderOpenedEmployee);
+  setTimeout(rerenderOpenedEmployee, 500);
 })();
