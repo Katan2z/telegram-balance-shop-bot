@@ -45,9 +45,10 @@ function loadEmployeeRegistrationScripts() {
 }
 
 function loadEmployeesSection() {
-  loadStyleOnce("employees.css?v=4");
+  loadStyleOnce("employees.css?v=5");
   loadScriptOnce("employees.js?v=4").then(() => {
     loadScriptOnce("employees-remove.js?v=1");
+    loadScriptOnce("employee-card-menu.js?v=1");
     if (typeof emp2Load === "function") emp2Load();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
