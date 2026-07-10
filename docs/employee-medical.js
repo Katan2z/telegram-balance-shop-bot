@@ -13,8 +13,16 @@
       .replaceAll("'", "&#039;");
   }
 
+  function employeeState() {
+    try {
+      if (typeof emp2State !== "undefined") return emp2State;
+    } catch (_) {}
+    return window.emp2State || null;
+  }
+
   function selectedEmployee() {
-    return window.emp2State?.rows?.find(item => Number(item.id) === Number(window.emp2State?.openedId)) || null;
+    const state = employeeState();
+    return state?.rows?.find(item => Number(item.id) === Number(state.openedId)) || null;
   }
 
   function daysLeft(value) {
