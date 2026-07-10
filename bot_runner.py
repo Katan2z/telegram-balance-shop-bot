@@ -32,7 +32,7 @@ def timesheet_answer(rows):
 
 @priority_router.message(Command("status"))
 async def status_command(message: Message):
-    await app.answer(message, "✅ Бот работает. Версия: timesheet-import-3")
+    await app.answer(message, "✅ Бот работает. Версия: timesheet-import-4")
 
 
 @priority_router.message(F.document)
@@ -69,7 +69,7 @@ async def main():
     if not app.db.enabled():
         raise RuntimeError("Supabase не настроен")
     print("Supabase storage enabled")
-    print("Bot version: timesheet-import-3")
+    print("Bot version: timesheet-import-4")
     bot = Bot(token=token)
     dp = Dispatcher()
     dp.include_router(priority_router)
