@@ -47,8 +47,14 @@ function loadEmployeeRegistrationScripts() {
 function loadEmployeesSection() {
   loadStyleOnce("employees.css?v=6");
   loadScriptOnce("employees.js?v=4").then(() => {
-    loadScriptOnce("employees-remove.js?v=1");
-    loadScriptOnce("employee-card-menu.js?v=1").then(() => loadScriptOnce("employee-medical.js?v=1"));
+    return loadScriptOnce("employee-state-bridge.js?v=1");
+  }).then(() => {
+    return loadScriptOnce("employees-remove.js?v=1");
+  }).then(() => {
+    return loadScriptOnce("employee-card-menu.js?v=2");
+  }).then(() => {
+    return loadScriptOnce("employee-medical.js?v=2");
+  }).then(() => {
     if (typeof emp2Load === "function") emp2Load();
     if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
   });
