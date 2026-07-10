@@ -6,6 +6,7 @@ import openpyxl
 import supabase_storage as db
 
 CURRENT_PERIOD = "current"
+MAX_PERIOD_HOURS = 1000.0
 
 
 def normalize_name(value: str) -> str:
@@ -23,11 +24,11 @@ def cell_hours(value) -> float:
         return 0.0
     if isinstance(value, (int, float)):
         value = float(value)
-        return value if 0 <= value <= 24 else 0.0
+        return value if 0 <= value <= MAX_PERIOD_HOURS else 0.0
     text = str(value).strip().replace(",", ".")
     if re.fullmatch(r"\d+(\.\d+)?", text):
         value = float(text)
-        return value if 0 <= value <= 24 else 0.0
+        return value if 0 <= value <= MAX_PERIOD_HOURS else 0.0
     return 0.0
 
 
