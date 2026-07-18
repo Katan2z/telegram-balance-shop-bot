@@ -18,9 +18,24 @@ class ScheduleTests(unittest.TestCase):
 
     def test_launch_week_has_sunday_deadline_exception(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_schedule_deadline_exception.sql").read_text(encoding="utf-8")
-        self.assertIn("p_week_start = date '2026-07-20'", migration)
+        self.assertIn("p_week_start = date '2026-07-27'", migration)
         self.assertIn("date '2026-07-19' + time '23:59'", migration)
         self.assertIn("else ((p_week_start - 5) + time '23:59')", migration)
+
+    def test_target_week_moves_forward_after_wednesday(self):
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        self.assertIn("isoDay > 3 ? 7 : 0", source)
+
+    def test_management_positions_are_excluded(self):
+        migration = (ROOT / "docs" / "migrations" / "20260718_schedule_week_and_admin_filter.sql").read_text(encoding="utf-8")
+        self.assertIn("(менеджер|заместител|управляющ)", migration)
+        self.assertIn("ep.telegram_id <> 818748106", migration)
+        self.assertIn("public.managers m where m.telegram_id = ep.telegram_id", migration)
+
+    def test_corrected_collection_week_is_27_july(self):
+        migration = (ROOT / "docs" / "migrations" / "20260718_schedule_week_and_admin_filter.sql").read_text(encoding="utf-8")
+        self.assertIn("date '2026-07-27'", migration)
+        self.assertIn("employee_input_override = false", migration)
 
     def test_admin_can_open_and_close_employee_input(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_schedule_manual_access.sql").read_text(encoding="utf-8")

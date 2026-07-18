@@ -47,7 +47,8 @@ function scheduleIso(date) {
 function scheduleNextMonday(now = new Date()) {
   const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const isoDay = date.getDay() || 7;
-  date.setDate(date.getDate() + (8 - isoDay));
+  const daysUntilNextMonday = 8 - isoDay;
+  date.setDate(date.getDate() + daysUntilNextMonday + (isoDay > 3 ? 7 : 0));
   return scheduleIso(date);
 }
 

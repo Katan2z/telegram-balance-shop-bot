@@ -1,6 +1,6 @@
 begin;
 
--- One-time launch exception: availability for 20–26 July can be submitted
+-- One-time launch exception: availability for 27 July – 2 August can be submitted
 -- through Sunday, 19 July 2026, 23:59 Moscow time.
 create or replace function public.schedule_ensure_week(p_actor_id bigint, p_week_start date)
 returns bigint
@@ -24,7 +24,7 @@ begin
   end if;
 
   v_deadline := case
-    when p_week_start = date '2026-07-20'
+    when p_week_start = date '2026-07-27'
       then (date '2026-07-19' + time '23:59') at time zone 'Europe/Moscow'
     else ((p_week_start - 5) + time '23:59') at time zone 'Europe/Moscow'
   end;
@@ -43,10 +43,10 @@ update public.schedule_weeks
 set submission_deadline = (date '2026-07-19' + time '23:59') at time zone 'Europe/Moscow',
     status = 'collecting',
     updated_at = now()
-where week_start = date '2026-07-20';
+where week_start = date '2026-07-27';
 
 commit;
 
 -- Verification:
 -- select week_start, submission_deadline at time zone 'Europe/Moscow'
--- from public.schedule_weeks where week_start = date '2026-07-20';
+-- from public.schedule_weeks where week_start = date '2026-07-27';
