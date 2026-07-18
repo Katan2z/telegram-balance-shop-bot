@@ -136,7 +136,104 @@ function emp2Selected() { return emp2State.rows.find(row => Number(row.id) === N
 function emp2Panel(html) { const root = document.getElementById("emp2Subpanel"); if (root) root.innerHTML = html; }
 function emp2Placeholder(icon, title) { emp2Panel(`<div class="employee-admin-subcard"><div class="employee-module-icon">${icon}</div><h3>${emp2Escape(title)}</h3></div>`); }
 function emp2ShowProfile() { const row = emp2Selected(); if (row) emp2Fill(row); }
-function emp2ShowPvv() { emp2Placeholder("📄", "Бланк ПВВ"); }
+const EMP2_PVV_BUCKET = "employee-pvv";
+const EMP2_PVV_MAX_BYTES = 15 * 1024 * 1024;
+const EMP2_PVV_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+
+async function emp2Storage(path, options = {}) {
+  const config = empCfg();
+  const response = await fetch(`${config.url}/storage/v1/${path}`, {
+    ...options,
+    cache: "no-store",
+    headers: {
+      apikey: config.key,
+      Authorization: `Bearer ${config.key}`,
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) throw new Error(await response.text());
+  if (response.status === 204) return null;
+  const contentType = response.headers.get("content-type") || "";
+  return contentType.includes("application/json") ? response.json() : response.text();
+}
+
+async function emp2PvvSignedUrl(storagePath) {
+  const result = await emp2Storage(`object/sign/${EMP2_PVV_BUCKET}/${storagePath}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ expiresIn: 3600 }),
+  });
+  const signedPath = result?.signedURL || result?.signedUrl;
+  if (!signedPath) throw new Error("Supabase did not return a signed URL");
+  if (signedPath.startsWith("http")) return signedPath;
+  if (signedPath.startsWith("/storage/v1/")) return `${empCfg().url}${signedPath}`;
+  return `${empCfg().url}/storage/v1${signedPath}`;
+}
+
+function emp2PvvPreview(documentRow, signedUrl) {
+  if (documentRow.mime_type === "application/pdf") {
+    return `<iframe class="employee-pvv-pdf" src="${emp2Escape(signedUrl)}#toolbar=1&navpanes=0&view=FitH" title="Бланк ПВВ ${emp2Escape(documentRow.file_name)}"></iframe>`;
+  }
+  return `<img class="employee-pvv-image" src="${emp2Escape(signedUrl)}" alt="Бланк ПВВ ${emp2Escape(documentRow.file_name)}">`;
+}
+
+async function emp2ShowPvv() {
+  const employee = emp2Selected();
+  if (!employee) return;
+  emp2Panel(`<div class="employee-admin-subcard"><h3>📄 Бланк ПВВ</h3><p>Загрузка…</p></div>`);
+  try {
+    const rows = await supabaseFetch(`employee_pvv_documents?employee_profile_id=eq.${Number(employee.id)}&select=*&limit=1`).catch(() => []);
+    const documentRow = rows?.[0] || null;
+    const signedUrl = documentRow ? await emp2PvvSignedUrl(documentRow.storage_path) : "";
+    emp2Panel(`<div class="employee-admin-subcard employee-pvv-card"><div class="employee-pvv-head"><div><h3>📄 Бланк ПВВ</h3><p>${emp2Escape(employee.full_name || "Сотрудник")}</p></div>${documentRow ? `<a class="tasks-refresh employee-pvv-open" href="${emp2Escape(signedUrl)}" target="_blank" rel="noopener">Открыть отдельно</a>` : ""}</div>
+      ${documentRow ? `<div class="employee-pvv-preview">${emp2PvvPreview(documentRow, signedUrl)}</div><div class="employee-pvv-meta"><strong>${emp2Escape(documentRow.file_name)}</strong><span>${Math.max(1, Math.round(Number(documentRow.size_bytes || 0) / 1024))} КБ</span></div>` : `<div class="employee-pvv-empty"><strong>Бланк ещё не загружен</strong><span>Поддерживаются PDF, JPG, PNG и WEBP до 15 МБ.</span></div>`}
+      <div class="employee-pvv-actions"><label class="action-btn add employee-pvv-picker"><input id="employeePvvFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" hidden><span>${documentRow ? "Заменить файл" : "Выбрать файл"}</span></label><button id="employeePvvUpload" class="action-btn add" type="button" disabled>Загрузить</button>${documentRow ? `<button id="employeePvvDelete" class="action-btn remove" type="button">Удалить</button>` : ""}</div><p id="employeePvvStatus" class="employee-status"></p></div>`);
+    const fileInput = document.getElementById("employeePvvFile");
+    const uploadButton = document.getElementById("employeePvvUpload");
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      uploadButton.disabled = !file;
+      document.getElementById("employeePvvStatus").textContent = file ? file.name : "";
+    };
+    uploadButton.onclick = () => emp2UploadPvv(employee, documentRow);
+    if (documentRow) document.getElementById("employeePvvDelete").onclick = () => emp2DeletePvv(employee, documentRow);
+  } catch (error) {
+    emp2Panel(`<div class="employee-admin-subcard"><h3>📄 Бланк ПВВ</h3><p>Не удалось загрузить документ. Сначала примени SQL-миграцию ПВВ.</p></div>`);
+  }
+}
+
+async function emp2UploadPvv(employee, previousDocument) {
+  const file = document.getElementById("employeePvvFile")?.files?.[0];
+  const status = document.getElementById("employeePvvStatus");
+  if (!file) return;
+  if (!EMP2_PVV_TYPES.has(file.type)) { status.textContent = "Нужен PDF, JPG, PNG или WEBP."; return; }
+  if (file.size > EMP2_PVV_MAX_BYTES) { status.textContent = "Файл больше 15 МБ."; return; }
+  const extension = (file.name.split(".").pop() || "file").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const storagePath = `${Number(employee.id)}/${crypto.randomUUID()}.${extension}`;
+  try {
+    status.textContent = "Загружаю…";
+    await emp2Storage(`object/${EMP2_PVV_BUCKET}/${storagePath}`, { method: "POST", headers: { "Content-Type": file.type, "x-upsert": "false" }, body: file });
+    await supabaseWrite("employee_pvv_documents?on_conflict=employee_profile_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ employee_profile_id: Number(employee.id), storage_path: storagePath, file_name: file.name, mime_type: file.type, size_bytes: file.size, updated_by: Number(window.BK8Permissions?.currentUserId || 0) || null, updated_at: new Date().toISOString() }) });
+    if (previousDocument?.storage_path) await emp2Storage(`object/${EMP2_PVV_BUCKET}/${previousDocument.storage_path}`, { method: "DELETE" }).catch(() => {});
+    await emp2ShowPvv();
+  } catch (error) {
+    await emp2Storage(`object/${EMP2_PVV_BUCKET}/${storagePath}`, { method: "DELETE" }).catch(() => {});
+    status.textContent = "Не удалось загрузить файл.";
+  }
+}
+
+async function emp2DeletePvv(employee, documentRow) {
+  if (!confirm(`Удалить бланк ПВВ сотрудника ${employee.full_name || ""}?`)) return;
+  const status = document.getElementById("employeePvvStatus");
+  try {
+    status.textContent = "Удаляю…";
+    await emp2Storage(`object/${EMP2_PVV_BUCKET}/${documentRow.storage_path}`, { method: "DELETE" });
+    await supabaseWrite(`employee_pvv_documents?employee_profile_id=eq.${Number(employee.id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await emp2ShowPvv();
+  } catch (error) {
+    status.textContent = "Не удалось удалить файл.";
+  }
+}
 function emp2ShowKlokr() { emp2Placeholder("🏆", "КЛОКР"); }
 function emp2ShowPurchases() { emp2Placeholder("🛒", "Покупки"); }
 function emp2ShowSettings() { emp2Placeholder("⚙️", "Настройки"); }
