@@ -22,6 +22,14 @@ class ScheduleTests(unittest.TestCase):
         self.assertIn("date '2026-07-19' + time '23:59'", migration)
         self.assertIn("else ((p_week_start - 5) + time '23:59')", migration)
 
+    def test_admin_can_open_and_close_employee_input(self):
+        migration = (ROOT / "docs" / "migrations" / "20260718_schedule_manual_access.sql").read_text(encoding="utf-8")
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        self.assertIn("employee_input_override boolean", migration)
+        self.assertIn("schedule_set_input_access", migration)
+        self.assertIn("Открыть сотрудникам", source)
+        self.assertIn("Закрыть сотрудникам", source)
+
     def test_employee_cannot_edit_another_profile(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_employee_schedule.sql").read_text(encoding="utf-8")
         self.assertIn("v_employee.telegram_id <> p_actor_id", migration)
