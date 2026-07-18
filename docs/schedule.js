@@ -151,7 +151,7 @@ function scheduleEmployeeMarkup(entry) {
 
 function scheduleAdminMarkup(entries) {
   return `<div class="schedule-table-wrap"><table class="schedule-table"><thead><tr><th>Сотрудник</th>${SCHEDULE_DAYS.map(([, label], index) => `<th>${label}<br><small>${scheduleDateText(scheduleAddDays(scheduleState.weekStart, index))}</small></th>`).join("")}<th>Комментарий</th><th>Ознакомлен<br>(роспись)</th><th></th></tr></thead><tbody>
-    ${entries.map(entry => `<tr data-schedule-profile="${entry.employee_profile_id}"><td><strong>${scheduleEscape(entry.employee_name)}</strong><small>${entry.submitted_at ? "Возможности заполнены" : "Не заполнено"}</small></td>${SCHEDULE_DAYS.map(([key]) => `<td><textarea data-final-day="${key}" placeholder="Смена или выходной">${scheduleEscape(entry.final_schedule?.[key] || "")}</textarea>${entry.availability?.[key] ? `<small class="schedule-availability">Может: ${scheduleEscape(entry.availability[key])}</small>` : ""}</td>`).join("")}<td><textarea class="schedule-comment" data-final-comment>${scheduleEscape(entry.comment || "")}</textarea></td><td class="schedule-signature"></td><td class="schedule-row-actions"><button type="button" data-save-row>Сохранить</button></td></tr>`).join("")}
+    ${entries.map(entry => `<tr data-schedule-profile="${entry.employee_profile_id}"><td><strong>${scheduleEscape(entry.employee_name)}</strong><small>${entry.submitted_at ? "Возможности заполнены" : "Не заполнено"}</small></td>${SCHEDULE_DAYS.map(([key]) => `<td><textarea data-final-day="${key}" placeholder="Смена или выходной">${scheduleEscape(entry.final_schedule?.[key] || entry.availability?.[key] || "")}</textarea></td>`).join("")}<td><textarea class="schedule-comment" data-final-comment>${scheduleEscape(entry.comment || "")}</textarea></td><td class="schedule-signature"></td><td class="schedule-row-actions"><button type="button" data-save-row>Сохранить</button></td></tr>`).join("")}
   </tbody></table></div>`;
 }
 
@@ -241,6 +241,10 @@ function scheduleCellFill(text) {
   return value ? "FFFFFFFF" : "FFFFD6B3";
 }
 
+function scheduleExportDayValue(entry, key) {
+  return entry.final_schedule?.[key] || entry.availability?.[key] || "";
+}
+
 async function scheduleExportExcel() {
   if (!window.ExcelJS) return scheduleSetStatus("Библиотека Excel ещё загружается. Попробуй через несколько секунд.");
   try {
@@ -257,8 +261,7 @@ async function scheduleExportExcel() {
     sheet.addRow(["№", "Сотрудник", ...SCHEDULE_DAYS.map(([, label], index) => `${label}\n${scheduleDateText(scheduleAddDays(scheduleState.weekStart, index))}`), "Комментарий", "Ознакомлен\n(роспись)"]);
     const header = sheet.getRow(2); header.height = 38; header.font = { bold: true }; header.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE699" } };
     (scheduleState.payload.entries || []).forEach((entry, index) => {
-      const values = entry.final_schedule || {};
-      const row = sheet.addRow([index + 1, entry.employee_name, ...SCHEDULE_DAYS.map(([key]) => values[key] || ""), entry.comment || "", ""]);
+      const row = sheet.addRow([index + 1, entry.employee_name, ...SCHEDULE_DAYS.map(([key]) => scheduleExportDayValue(entry, key)), entry.comment || "", ""]);
       row.height = 34; row.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
       row.getCell(2).alignment = { vertical: "middle", horizontal: "left", wrapText: true };
       SCHEDULE_DAYS.forEach(([,], dayIndex) => { row.getCell(dayIndex + 3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: scheduleCellFill(row.getCell(dayIndex + 3).value) } }; });

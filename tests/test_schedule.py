@@ -57,6 +57,16 @@ class ScheduleTests(unittest.TestCase):
         self.assertIn('"Комментарий", "Ознакомлен\\n(роспись)"', source)
         self.assertIn("workbook.xlsx.writeBuffer()", source)
 
+    def test_excel_falls_back_to_employee_availability(self):
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        self.assertIn('entry.final_schedule?.[key] || entry.availability?.[key] || ""', source)
+        self.assertIn("scheduleExportDayValue(entry, key)", source)
+
+    def test_admin_cells_show_availability_without_hint_row(self):
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        self.assertIn('entry.final_schedule?.[key] || entry.availability?.[key] || ""', source)
+        self.assertNotIn('class="schedule-availability"', source)
+
     def test_admin_and_employee_values_are_separate(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_employee_schedule.sql").read_text(encoding="utf-8")
         self.assertIn("availability jsonb", migration)
