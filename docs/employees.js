@@ -234,8 +234,59 @@ async function emp2DeletePvv(employee, documentRow) {
     status.textContent = "Не удалось удалить файл.";
   }
 }
-function emp2ShowKlokr() { emp2Placeholder("🏆", "КЛОКР"); }
-function emp2ShowPurchases() { emp2Placeholder("🛒", "Покупки"); }
+function emp2HistoryDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function emp2KlokrPosition(assessment) {
+  const item = Array.isArray(assessment.items) ? assessment.items.find(row => ["kitchen", "service"].includes(row.position)) : null;
+  if (item?.position === "kitchen") return "Кухня";
+  if (item?.position === "service") return "Сервис";
+  const comment = String(assessment.comment || "");
+  if (comment.includes("[Кухня]")) return "Кухня";
+  if (comment.includes("[Сервис]")) return "Сервис";
+  return "КЛОКР";
+}
+
+function emp2KlokrComment(value) { return String(value || "").replace(/^\[(Кухня|Сервис)\]\s*/i, "").trim(); }
+
+async function emp2ShowKlokr() {
+  const employee = emp2Selected();
+  if (!employee) return;
+  if (!employee.telegram_id) { emp2Panel(`<div class="employee-admin-subcard"><h3>🏆 КЛОКР</h3><p>Сотрудник ещё не активирован.</p></div>`); return; }
+  emp2Panel(`<div class="employee-admin-subcard"><h3>🏆 КЛОКР</h3><p>Загрузка истории…</p></div>`);
+  const assessments = await supabaseFetch(`klokr_assessments?employee_id=eq.${Number(employee.telegram_id)}&select=*&order=created_at.desc&limit=100`).catch(() => []);
+  const instructorIds = [...new Set((assessments || []).map(row => row.instructor_id).filter(Boolean).map(String))];
+  const instructors = instructorIds.length ? await supabaseFetch(`users?telegram_id=in.(${instructorIds.join(",")})&select=telegram_id,first_name,username`).catch(() => []) : [];
+  const instructorNames = new Map((instructors || []).map(row => [String(row.telegram_id), row.first_name || (row.username ? `@${row.username}` : "Инструктор")]));
+  const average = assessments.length ? Math.round(assessments.reduce((sum, row) => sum + Number(row.percent || 0), 0) / assessments.length) : 0;
+  emp2Panel(`<div class="employee-admin-subcard employee-history-card"><div class="employee-history-head"><div><h3>🏆 КЛОКР</h3><p>${emp2Escape(employee.full_name || "Сотрудник")}</p></div><strong>${assessments.length ? `${average}% средний` : "Нет проверок"}</strong></div><div class="employee-history-list">${assessments.map(row => {
+    const comment = emp2KlokrComment(row.comment);
+    const items = Array.isArray(row.items) ? row.items : [];
+    return `<article class="employee-klokr-entry"><div class="employee-history-score">${Number(row.percent || 0)}%</div><div><div class="employee-history-title"><strong>${emp2Escape(emp2KlokrPosition(row))}</strong><time>${emp2Escape(emp2HistoryDate(row.created_at))}</time></div><p>${Number(row.total_score || 0)}/${Number(row.max_score || 0)} баллов · Инструктор: ${emp2Escape(instructorNames.get(String(row.instructor_id)) || "—")}</p>${comment ? `<blockquote>${emp2Escape(comment)}</blockquote>` : ""}${items.length ? `<details><summary>Пункты проверки</summary><div class="employee-klokr-points">${items.map(item => `<div><span>${emp2Escape(item.title || "Пункт")}</span><b>${Number(item.score || 0)}/${Number(item.max || 0)}</b></div>`).join("")}</div></details>` : ""}</div></article>`;
+  }).join("") || `<div class="employee-history-empty">Проверок КЛОКР пока нет.</div>`}</div></div>`);
+}
+
+function emp2PurchaseStatus(row) {
+  if (row.status === "redeemed") return { text: "Выдано", className: "is-done" };
+  if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return { text: "Срок истёк", className: "is-expired" };
+  if (row.status === "active") return { text: "Ожидает выдачи", className: "is-active" };
+  return { text: row.status || "—", className: "" };
+}
+
+async function emp2ShowPurchases() {
+  const employee = emp2Selected();
+  if (!employee) return;
+  if (!employee.telegram_id) { emp2Panel(`<div class="employee-admin-subcard"><h3>🛒 Покупки</h3><p>Сотрудник ещё не активирован.</p></div>`); return; }
+  emp2Panel(`<div class="employee-admin-subcard"><h3>🛒 Покупки</h3><p>Загрузка истории…</p></div>`);
+  const purchases = await supabaseFetch(`shop_purchases?user_id=eq.${Number(employee.telegram_id)}&select=*&order=created_at.desc&limit=100`).catch(() => []);
+  const totalCoins = purchases.reduce((sum, row) => sum + Number(row.price_coins || 0), 0);
+  emp2Panel(`<div class="employee-admin-subcard employee-history-card"><div class="employee-history-head"><div><h3>🛒 Покупки</h3><p>${emp2Escape(employee.full_name || "Сотрудник")}</p></div><strong>🪙 ${totalCoins} всего</strong></div><div class="employee-history-list">${purchases.map(row => {
+    const status = emp2PurchaseStatus(row);
+    return `<article class="employee-purchase-entry"><div><div class="employee-history-title"><strong>${emp2Escape(row.item_title || "Покупка")}</strong><time>${emp2Escape(emp2HistoryDate(row.created_at))}</time></div><p>Код: <code>${emp2Escape(row.receipt_code || "—")}</code> · 🪙 ${Number(row.price_coins || 0)}</p></div><b class="employee-purchase-status ${status.className}">${emp2Escape(status.text)}</b></article>`;
+  }).join("") || `<div class="employee-history-empty">Покупок пока нет.</div>`}</div></div>`);
+}
 function emp2ShowSettings() { emp2Placeholder("⚙️", "Настройки"); }
 
 const EMP2_MEDICAL_WARNING_DAYS = 30;
