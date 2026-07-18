@@ -294,10 +294,6 @@ function ensureAdminTabs(data) {
     tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="managers">Менеджеры</button>');
     tabs.querySelector('[data-tab="managers"]').addEventListener("click", () => switchTab("managers"));
   }
-  if (isRootAdmin(data) && !tabs.querySelector('[data-tab="employees"]')) {
-    tabs.insertAdjacentHTML("beforeend", '<button class="tab" data-tab="employees">Сотрудники</button>');
-    tabs.querySelector('[data-tab="employees"]').addEventListener("click", () => switchTab("employees"));
-  }
 }
 
 const employeesState = { rows: [], editingId: null, query: "" };
@@ -647,7 +643,6 @@ async function renderApp() {
     renderHero(data.top_month);
     renderKlokrTop(data.klokr_top);
     setupAdmin(data);
-    await setupEmployees(data);
   } catch (error) {
     setText("userName", "Не удалось загрузить данные");
   }
@@ -655,4 +650,3 @@ async function renderApp() {
 
 if (user) setText("userName", user.first_name || user.username || "Сотрудник");
 renderApp();
-setInterval(renderApp, 10000);

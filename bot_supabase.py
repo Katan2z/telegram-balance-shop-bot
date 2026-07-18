@@ -327,10 +327,6 @@ async def handle_payload(message, payload):
 
 @router.message(CommandStart())
 async def start_handler(message: Message):
-    if message.from_user and db.enabled():
-        db.upsert_user(message.from_user)
-        if message.chat.type != "private":
-            db.save_chat(message.chat)
     args = message.text.split(maxsplit=1)
     if len(args) > 1 and await handle_payload(message, args[1].strip()):
         return
@@ -339,8 +335,6 @@ async def start_handler(message: Message):
 
 @router.message(Command("app"))
 async def app_handler(message: Message):
-    if message.from_user and db.enabled():
-        db.upsert_user(message.from_user)
     await answer(message, "Открой личный чат с ботом и нажми кнопку меню «Спасибки».", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Открыть бота", url=bot_url())]]))
 
 
@@ -353,21 +347,9 @@ async def uved_command(message: Message):
         await answer(message, "⛔ Команда доступна только админам и менеджерам.")
         return
     if db.enabled():
-        db.upsert_user(message.from_user)
         db.save_chat(message.chat)
         db.set_setting(TASK_NOTIFY_SETTING_KEY, str(message.chat.id))
     await answer(message, f"✅ Уведомления о новых задачах будут приходить в эту беседу.\nЧат: {message.chat.title or message.chat.id}")
-
-
-@router.message(F.new_chat_members)
-async def new_members_handler(message: Message):
-    if db.enabled():
-        for user in message.new_chat_members:
-            if not user.is_bot:
-                db.upsert_user(user)
-        if message.chat.type != "private":
-            db.save_chat(message.chat)
-    await answer(message, "✅ Новые участники сохранены.")
 
 
 @router.message(Command("admin"))
@@ -427,10 +409,6 @@ async def sync_command(message: Message):
 
 @router.message()
 async def text_handler(message: Message):
-    if message.from_user and db.enabled():
-        db.upsert_user(message.from_user)
-        if message.chat.type != "private":
-            db.save_chat(message.chat)
     if not message.from_user or not is_admin(message.from_user.id):
         return
     state = ADMIN_STATES.get(message.from_user.id)
@@ -464,8 +442,6 @@ async def menu_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data == "balance")
 async def balance_callback(callback: CallbackQuery):
-    if db.enabled():
-        db.upsert_user(callback.from_user)
     balance = db.get_balance(callback.from_user.id) if db.enabled() else 0
     await callback.message.edit_text(f"Спасибки: {balance}", reply_markup=main_menu(callback.from_user.id))
     await callback.answer()
