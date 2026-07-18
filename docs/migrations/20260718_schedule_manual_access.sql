@@ -67,6 +67,9 @@ begin
       on se.week_id = v_week.id and se.employee_profile_id = ep.id
     where ep.activation_status = 'active'
       and ep.telegram_id is not null
+      and ep.telegram_id <> 818748106
+      and not exists (select 1 from public.managers m where m.telegram_id = ep.telegram_id)
+      and not (lower(coalesce(ep.position, '')) ~ '(менеджер|заместител|управляющ)')
       and (v_is_admin or ep.telegram_id = p_actor_id)
   ) rows_for_actor;
 
