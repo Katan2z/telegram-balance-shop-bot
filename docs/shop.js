@@ -281,7 +281,7 @@ function shopAdminRender() {
     </div>
   `;
   document.querySelectorAll("[data-confirm-receipt]").forEach(button => {
-    button.onclick = () => shopAdminConfirmReceipt(Number(button.dataset.confirmReceipt));
+    button.onclick = () => shopAdminConfirmReceipt(button.dataset.confirmReceipt);
   });
   if (refresh) refresh.onclick = () => shopAdminLoad(true).catch(() => {});
 }
@@ -310,7 +310,7 @@ async function shopAdminLoad(force = false) {
 
 async function shopAdminConfirmReceipt(id) {
   const status = document.getElementById("shopAdminStatus");
-  const receipt = shopAdminState.receipts.find(item => Number(item.id) === Number(id));
+  const receipt = shopAdminState.receipts.find(item => String(item.id) === String(id));
   if (!receipt) return;
   if (!await shopConfirm(`Выдать награду по чеку ${receipt.receipt_code}?`)) return;
   try {
@@ -318,7 +318,7 @@ async function shopAdminConfirmReceipt(id) {
     await shopFetch("rpc/redeem_shop_purchase", {
       method: "POST",
       body: JSON.stringify({
-        p_purchase_id: Number(id),
+        p_purchase_id: String(id),
         p_manager_id: Number(userId),
       }),
     });
