@@ -10,7 +10,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from timesheet_import import format_hours, parse_timesheet
 
-MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/?v=20260718-medical")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://katan2z.github.io/telegram-balance-shop-bot/?v=20260718-medical2")
 ROOT_ADMIN_IDS = {int(x) for x in os.getenv("ROOT_ADMIN_IDS", "818748106").split(",") if x.strip().isdigit()}
 SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY") or ""

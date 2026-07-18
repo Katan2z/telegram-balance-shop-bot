@@ -127,10 +127,25 @@ function emp2Render() {
 
 async function emp2Load() { if (!window.BK8Permissions?.can("manageEmployees")) return; emp2Build(); emp2State.rows = await supabaseFetch("employee_profiles?select=*&order=created_at.desc&limit=300").catch(() => []); emp2Render(); }
 window.emp2State = emp2State;
-window.addEventListener("bk8:employees-ready", async () => {
-  await emp2Load().catch(() => {});
-  await emp2LoadMedicalAlerts().catch(() => {});
-}, { once: true });
+let emp2Initialization = null;
+async function emp2Initialize() {
+  if (emp2Initialization) return emp2Initialization;
+  emp2Initialization = (async () => {
+    const permissions = window.BK8Permissions;
+    if (permissions && !permissions.state.loaded) await permissions.load();
+    if (!permissions?.can("manageEmployees")) return;
+    await emp2Load();
+    await emp2LoadMedicalAlerts();
+  })().catch(error => {
+    emp2Initialization = null;
+    console.error("Employee module initialization failed", error);
+  });
+  return emp2Initialization;
+}
+window.addEventListener("bk8:employees-ready", emp2Initialize, { once: true });
+document.addEventListener("bk8:permissions-ready", emp2Initialize, { once: true });
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", emp2Initialize, { once: true });
+else emp2Initialize();
 
 function emp2Selected() { return emp2State.rows.find(row => Number(row.id) === Number(emp2State.openedId)); }
 function emp2Panel(html) { const root = document.getElementById("emp2Subpanel"); if (root) root.innerHTML = html; }
