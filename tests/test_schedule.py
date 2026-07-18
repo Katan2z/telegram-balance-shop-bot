@@ -16,6 +16,12 @@ class ScheduleTests(unittest.TestCase):
         self.assertIn("(p_week_start - 5) + time '23:59'", migration)
         self.assertIn("at time zone 'Europe/Moscow'", migration)
 
+    def test_launch_week_has_sunday_deadline_exception(self):
+        migration = (ROOT / "docs" / "migrations" / "20260718_schedule_deadline_exception.sql").read_text(encoding="utf-8")
+        self.assertIn("p_week_start = date '2026-07-20'", migration)
+        self.assertIn("date '2026-07-19' + time '23:59'", migration)
+        self.assertIn("else ((p_week_start - 5) + time '23:59')", migration)
+
     def test_employee_cannot_edit_another_profile(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_employee_schedule.sql").read_text(encoding="utf-8")
         self.assertIn("v_employee.telegram_id <> p_actor_id", migration)
