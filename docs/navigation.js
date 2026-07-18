@@ -1,6 +1,7 @@
 const PRIMARY_TABS = new Set(["home", "shop"]);
 const QUICK_ACTIONS = [
   { tab: "profile", icon: "👤", title: "Мой профиль", text: "Личные данные" },
+  { tab: "schedule", icon: "📅", title: "Расписание", text: "Смены и возможности" },
   { tab: "employees", icon: "👥", title: "Сотрудники", text: "Профили и коды" },
   { tab: "rating", icon: "🏆", title: "Рейтинг", text: "Топ месяца" },
   { tab: "my-klokr", icon: "📋", title: "Мои КЛОКР", text: "История проверок" },
