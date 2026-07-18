@@ -7,6 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_app_exposes_telegram_user_id_to_modules(self):
+        source = (ROOT / "docs" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("window.userId = userId", source)
+
     def test_deadline_is_previous_wednesday_moscow_time(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_employee_schedule.sql").read_text(encoding="utf-8")
         self.assertIn("(p_week_start - 5) + time '23:59'", migration)

@@ -3,6 +3,7 @@ if (tg) tg.expand();
 
 const user = tg?.initDataUnsafe?.user || null;
 const userId = user ? String(user.id) : null;
+window.userId = userId;
 const medal = ["🥇", "🥈", "🥉"];
 const BOT_USERNAME = "bk8_shop_bot";
 const ROOT_ADMIN_IDS = ["818748106"];
