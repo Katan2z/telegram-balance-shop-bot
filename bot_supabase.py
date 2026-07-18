@@ -17,7 +17,7 @@ from aiogram.types import (
 import supabase_storage as db
 
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
-MINI_APP_RELEASE = os.getenv("MINI_APP_RELEASE", "20260718-profile2")
+MINI_APP_RELEASE = os.getenv("MINI_APP_RELEASE", "20260718-functions1")
 MINI_APP_URL = os.getenv(
     "MINI_APP_URL",
     f"https://katan2z.github.io/telegram-balance-shop-bot/?v={MINI_APP_RELEASE}",

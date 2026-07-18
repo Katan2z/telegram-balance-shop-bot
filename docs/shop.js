@@ -112,6 +112,14 @@ function shopFormatTime(value) {
   return `${time}, ${day}`;
 }
 
+function shopConfirm(message) {
+  const webApp = window.Telegram?.WebApp;
+  if (typeof webApp?.showConfirm === "function") {
+    return new Promise(resolve => webApp.showConfirm(message, resolve));
+  }
+  return Promise.resolve(window.confirm(message));
+}
+
 function shopPhoto(item) {
   if (item.image_url) return `<img src="${shopEscape(item.image_url)}" alt="${shopEscape(item.title)}" loading="lazy" />`;
   return `<span>${shopEscape(item.emoji || "🎁")}</span>`;
@@ -304,19 +312,22 @@ async function shopAdminConfirmReceipt(id) {
   const status = document.getElementById("shopAdminStatus");
   const receipt = shopAdminState.receipts.find(item => Number(item.id) === Number(id));
   if (!receipt) return;
-  if (!confirm(`Выдать награду по чеку ${receipt.receipt_code}?`)) return;
+  if (!await shopConfirm(`Выдать награду по чеку ${receipt.receipt_code}?`)) return;
   try {
     if (status) status.textContent = "Подтверждаем чек...";
-    await shopFetch(`shop_purchases?id=eq.${id}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ status: "redeemed" }),
+    await shopFetch("rpc/redeem_shop_purchase", {
+      method: "POST",
+      body: JSON.stringify({
+        p_purchase_id: Number(id),
+        p_manager_id: Number(userId),
+      }),
     });
     if (status) status.textContent = "✅ Чек подтверждён. Награда выдана.";
     await shopAdminLoad(true);
     await shopLoad();
   } catch (error) {
-    if (status) status.textContent = "Не получилось подтвердить чек. Проверь права Supabase для shop_purchases.";
+    console.error("Shop receipt confirmation failed", error);
+    if (status) status.textContent = `Не получилось подтвердить чек: ${error.message || "ошибка Supabase"}`;
   }
 }
 
