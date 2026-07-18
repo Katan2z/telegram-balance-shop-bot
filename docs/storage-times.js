@@ -32,22 +32,6 @@ window.STORAGE_ITEMS = [
     "sourceRow": 7
   },
   {
-    "name": "Маффин",
-    "prepHours": 60.0,
-    "defrostType": "*",
-    "defrostHours": 12.0,
-    "storageHours": 48.0,
-    "prepRaw": "60 часов",
-    "defrostRaw": "12 часов",
-    "storageRaw": "48 часов",
-    "prepLabel": "П/T/Д = 12ч./48ч.",
-    "prepPlace": "каждый пэн без решётки",
-    "productionHours": null,
-    "productionLabel": "-",
-    "productionPlace": "-",
-    "sourceRow": 8
-  },
-  {
     "name": "Грибы жареные",
     "prepHours": 48.0,
     "defrostType": "*",
@@ -61,7 +45,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 4.0,
     "productionLabel": "ТД = 4 часа",
     "productionPlace": "каждый пэн",
-    "sourceRow": 9
+    "sourceRow": 8
   },
   {
     "name": "Бекон жареный",
@@ -77,7 +61,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 4.0,
     "productionLabel": "ТД = 4 часа (вкл. время выдержки 1 час)",
     "productionPlace": "каждый пэн",
-    "sourceRow": 10
+    "sourceRow": 9
   },
   {
     "name": "Хрустящий лук (Корона Фуд)",
@@ -93,7 +77,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 8.0,
     "productionLabel": "ТД = 8 часов",
     "productionPlace": "каждый пэн",
-    "sourceRow": 11
+    "sourceRow": 10
   },
   {
     "name": "Лук красный маринованный",
@@ -109,7 +93,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 4.0,
     "productionLabel": "ТД = 4 часа (вкл. время выдержки 1 час)",
     "productionPlace": "каждый пэн (+ решетка)",
-    "sourceRow": 12
+    "sourceRow": 11
   },
   {
     "name": "Майонез 65%",
@@ -124,11 +108,11 @@ window.STORAGE_ITEMS = [
     "prepPlace": "каждый сливс",
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
-    "productionPlace": "каждый пэн/туба",
-    "sourceRow": 14
+    "productionPlace": "каждая туба",
+    "sourceRow": 13
   },
   {
-    "name": "Соус \"Бургер-Соус Оригинальный\" (Соус \"Кинг\")",
+    "name": "Соус \"Бургер-Соус Оригинальный\"",
     "prepHours": 12.0,
     "defrostType": "",
     "defrostHours": null,
@@ -141,7 +125,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 15
+    "sourceRow": 14
   },
   {
     "name": "Соус Пармезан",
@@ -157,7 +141,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 16
+    "sourceRow": 15
   },
   {
     "name": "Соус Барбекю",
@@ -173,7 +157,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 17
+    "sourceRow": 16
   },
   {
     "name": "Горчица \"Heinz\"",
@@ -189,7 +173,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 18
+    "sourceRow": 17
   },
   {
     "name": "Соус Тар-Тар",
@@ -205,7 +189,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 19
+    "sourceRow": 18
   },
   {
     "name": "Кетчуп",
@@ -221,7 +205,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 20
+    "sourceRow": 19
   },
   {
     "name": "Соус Цезарь \"Heinz\"",
@@ -237,7 +221,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 21
+    "sourceRow": 20
   },
   {
     "name": "Соус Сырный",
@@ -253,23 +237,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 22
-  },
-  {
-    "name": "Соус Лесные грибы",
-    "prepHours": 12.0,
-    "defrostType": "",
-    "defrostHours": null,
-    "storageHours": null,
-    "prepRaw": "ТД = 12 часов",
-    "defrostRaw": "",
-    "storageRaw": "каждая туба",
-    "prepLabel": "ТД = 120 часов",
-    "prepPlace": "каждый сливс",
-    "productionHours": 12.0,
-    "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
-    "productionPlace": "каждая туба",
-    "sourceRow": 23
+    "sourceRow": 21
   },
   {
     "name": "Соус Гриль",
@@ -285,7 +253,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
     "productionPlace": "каждая туба",
-    "sourceRow": 24
+    "sourceRow": 22
   },
   {
     "name": "Соус \"Сырный\" Чеддер Хамон",
@@ -300,6 +268,38 @@ window.STORAGE_ITEMS = [
     "prepPlace": "каждый сливс",
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
+    "productionPlace": "каждая туба",
+    "sourceRow": 23
+  },
+  {
+    "name": "Соус \"4 сыра\"",
+    "prepHours": 12.0,
+    "defrostType": "",
+    "defrostHours": null,
+    "storageHours": null,
+    "prepRaw": "ТД = 12 часов",
+    "defrostRaw": "",
+    "storageRaw": "каждая туба",
+    "prepLabel": "ТД = 48 часов",
+    "prepPlace": "каждый сливс",
+    "productionHours": 12.0,
+    "productionLabel": "ТД = 12 часов (вкл. время выдержки 1 час)",
+    "productionPlace": "каждая туба",
+    "sourceRow": 24
+  },
+  {
+    "name": "Топпинг Клубника-Банан (для сэндвича)",
+    "prepHours": null,
+    "defrostType": "",
+    "defrostHours": null,
+    "storageHours": null,
+    "prepRaw": "-",
+    "defrostRaw": "",
+    "storageRaw": "-",
+    "prepLabel": "ТД = 30 дней (t +18_+29°С)",
+    "prepPlace": "открытая бутылка",
+    "productionHours": 12.0,
+    "productionLabel": "ТД = 12 часов",
     "productionPlace": "каждая туба",
     "sourceRow": 25
   },
@@ -394,8 +394,8 @@ window.STORAGE_ITEMS = [
     "storageRaw": "каждый пэн",
     "prepLabel": "ТД = 72 часа",
     "prepPlace": "каждый сливс",
-    "productionHours": 3.0,
-    "productionLabel": "ТД = 3 часа",
+    "productionHours": 2.0,
+    "productionLabel": "ТД = 2 часа",
     "productionPlace": "каждый пэн",
     "sourceRow": 32
   },
@@ -416,7 +416,23 @@ window.STORAGE_ITEMS = [
     "sourceRow": 33
   },
   {
-    "name": "Шоколадный\\Карамельный топпинг (в бункере)",
+    "name": "Сыр \"Микс трех сыров\"",
+    "prepHours": null,
+    "defrostType": "",
+    "defrostHours": null,
+    "storageHours": null,
+    "prepRaw": "-",
+    "defrostRaw": "",
+    "storageRaw": "-",
+    "prepLabel": "ТД = 72 часа",
+    "prepPlace": "каждый сливс",
+    "productionHours": 4.0,
+    "productionLabel": "ТД = 4 часа",
+    "productionPlace": "каждый пэн (допустимо хранение на льду)",
+    "sourceRow": 34
+  },
+  {
+    "name": "Шоколадный топпинг/Карамельный топпинг               (в бункере)",
     "prepHours": null,
     "defrostType": "",
     "defrostHours": null,
@@ -429,7 +445,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 168.0,
     "productionLabel": "ТД = 7 дней",
     "productionPlace": "каждая ванночка для топпинга",
-    "sourceRow": 35
+    "sourceRow": 36
   },
   {
     "name": "Шоколадный топпинг для коктейлей и мороженого",
@@ -437,18 +453,34 @@ window.STORAGE_ITEMS = [
     "defrostType": "",
     "defrostHours": null,
     "storageHours": null,
-    "prepRaw": "",
+    "prepRaw": "-",
     "defrostRaw": "",
-    "storageRaw": "",
+    "storageRaw": "-",
     "prepLabel": "-",
     "prepPlace": "-",
     "productionHours": 720.0,
     "productionLabel": "ТД = 30 дней (t +1_+27°С)",
     "productionPlace": "открытая бутылка",
-    "sourceRow": 36
+    "sourceRow": 37
   },
   {
-    "name": "Шоколадный\\Клубничный\\Пломбир сироп для коктейлей",
+    "name": "Топпинг Клубника-Банан (для десертов)",
+    "prepHours": null,
+    "defrostType": "",
+    "defrostHours": null,
+    "storageHours": null,
+    "prepRaw": "-",
+    "defrostRaw": "",
+    "storageRaw": "-",
+    "prepLabel": "-",
+    "prepPlace": "-",
+    "productionHours": 720.0,
+    "productionLabel": "ТД = 30 дней (t +18_+29°С)",
+    "productionPlace": "открытая бутылка",
+    "sourceRow": 38
+  },
+  {
+    "name": "Пломбир сироп для коктейлей",
     "prepHours": null,
     "defrostType": "",
     "defrostHours": null,
@@ -461,7 +493,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 336.0,
     "productionLabel": "ТД = 14 дней (t +18_+30°С)",
     "productionPlace": "каждый сиропный танк",
-    "sourceRow": 37
+    "sourceRow": 39
   },
   {
     "name": "Вафельный рожок",
@@ -477,7 +509,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 120.0,
     "productionLabel": "ТД = 5 дней - в пэне с крышкой; Д = 24 часа в диспенсере комбо-машины",
     "productionPlace": "каждый пэн\\диспенсер",
-    "sourceRow": 38
+    "sourceRow": 40
   },
   {
     "name": "Сиропы для горячих/холодных напитков (лаванда, макадамия, мохито, черная смородина, попкорн)",
@@ -493,7 +525,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 1440.0,
     "productionLabel": "ТД = 60 дней",
     "productionPlace": "открытая бутылка",
-    "sourceRow": 39
+    "sourceRow": 41
   },
   {
     "name": "Сиропы для горячих/холодных напитков (ваниль, соленая карамель, ирландские сливки)",
@@ -509,7 +541,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 720.0,
     "productionLabel": "ТД = 30 дней",
     "productionPlace": "открытая бутылка",
-    "sourceRow": 40
+    "sourceRow": 42
   },
   {
     "name": "Салат Aйсберг",
@@ -525,7 +557,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 3.0,
     "productionLabel": "ТД = 3 часа (включая 1 час время выдержки)",
     "productionPlace": "каждый пэн",
-    "sourceRow": 42
+    "sourceRow": 44
   },
   {
     "name": "Помидоры (мытые дез.)",
@@ -541,7 +573,7 @@ window.STORAGE_ITEMS = [
     "productionHours": null,
     "productionLabel": "-",
     "productionPlace": "-",
-    "sourceRow": 43
+    "sourceRow": 45
   },
   {
     "name": "Помидоры нарезанные",
@@ -557,7 +589,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 3.0,
     "productionLabel": "ТД = 3 часа",
     "productionPlace": "каждый пэн (+ решетка)",
-    "sourceRow": 44
+    "sourceRow": 46
   },
   {
     "name": "Лук нарезанный",
@@ -573,7 +605,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 3.0,
     "productionLabel": "ТД = 3 часа (включая 1 час время выдержки)",
     "productionPlace": "каждый пэн (+ решетка)",
-    "sourceRow": 45
+    "sourceRow": 47
   },
   {
     "name": "Огурцы маринованные",
@@ -589,23 +621,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 24.0,
     "productionLabel": "ТД = 24 часа (без рассола)",
     "productionPlace": "каждый пэн (+ решетка)",
-    "sourceRow": 46
-  },
-  {
-    "name": "Бекон охлажденный",
-    "prepHours": null,
-    "defrostType": "",
-    "defrostHours": null,
-    "storageHours": null,
-    "prepRaw": "-",
-    "defrostRaw": "",
-    "storageRaw": "-",
-    "prepLabel": "ТД = 72 часов",
-    "prepPlace": "каждый сливс (в пэне без решетки)",
-    "productionHours": 2.0,
-    "productionLabel": "ТД = 2 часа",
-    "productionPlace": "каждый пэн (+ решетка)",
-    "sourceRow": 47
+    "sourceRow": 48
   },
   {
     "name": "Халапеньо (Oliveto)",
@@ -621,7 +637,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов \n(с рассолом - только для выдержки продукта (1 час)) \nТД = 2 часа \n(с решёткой - только на борту. Если продукт не выдержан - 1 час выдержки, 1 час хранения)",
     "productionPlace": "каждый пэн",
-    "sourceRow": 48
+    "sourceRow": 49
   },
   {
     "name": "Молоко",
@@ -637,7 +653,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 12.0,
     "productionLabel": "ТД = 12 часов (срок мытья и дезинфекции контейнера)",
     "productionPlace": "контейнер с молоком",
-    "sourceRow": 49
+    "sourceRow": 50
   },
   {
     "name": "Основа для салата Цезарь",
@@ -653,7 +669,7 @@ window.STORAGE_ITEMS = [
     "productionHours": null,
     "productionLabel": "-",
     "productionPlace": "-",
-    "sourceRow": 50
+    "sourceRow": 51
   },
   {
     "name": "Кофе зерна",
@@ -669,7 +685,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 48.0,
     "productionLabel": "ТД = 48 часов",
     "productionPlace": "контейнер кофемашины",
-    "sourceRow": 51
+    "sourceRow": 52
   },
   {
     "name": "Кег пива",
@@ -682,10 +698,10 @@ window.STORAGE_ITEMS = [
     "storageRaw": "-",
     "prepLabel": "-",
     "prepPlace": "-",
-    "productionHours": 120.0,
-    "productionLabel": "ТД = 5 суток (зима), ТД=3 дня (лето) \n01.10-30.04/01.05 – 30.09",
+    "productionHours": 168.0,
+    "productionLabel": "ТД = 7 дней",
     "productionPlace": "каждый кег",
-    "sourceRow": 52
+    "sourceRow": 53
   },
   {
     "name": "Вода питьевая газированная AURA 1,5 л",
@@ -701,7 +717,23 @@ window.STORAGE_ITEMS = [
     "productionHours": null,
     "productionLabel": "-",
     "productionPlace": "-",
-    "sourceRow": 53
+    "sourceRow": 54
+  },
+  {
+    "name": "Пунш Апельсин-Лайм",
+    "prepHours": null,
+    "defrostType": "",
+    "defrostHours": null,
+    "storageHours": null,
+    "prepRaw": "-",
+    "defrostRaw": "",
+    "storageRaw": "-",
+    "prepLabel": "-",
+    "prepPlace": "-",
+    "productionHours": null,
+    "productionLabel": "Согласно сроку годности на упаковке",
+    "productionPlace": "каждый стик",
+    "sourceRow": 55
   },
   {
     "name": "Смесь для мороженого/шейков в ванне шейк-машины",
@@ -717,7 +749,7 @@ window.STORAGE_ITEMS = [
     "productionHours": 336.0,
     "productionLabel": "ТД = 14 дней",
     "productionPlace": "каждая ванна шейк-машины",
-    "sourceRow": 55
+    "sourceRow": 56
   },
   {
     "name": "Смесь для мороженого/шейков (в пакете)",
@@ -733,7 +765,7 @@ window.STORAGE_ITEMS = [
     "productionHours": null,
     "productionLabel": "-",
     "productionPlace": "-",
-    "sourceRow": 56
+    "sourceRow": 57
   },
   {
     "name": "Емкость для хранения льда",
@@ -749,11 +781,11 @@ window.STORAGE_ITEMS = [
     "productionHours": 24.0,
     "productionLabel": "ТД = 24 часа",
     "productionPlace": "крышка емкости",
-    "sourceRow": 57
+    "sourceRow": 58
   },
   {
     "name": "Ломтики ветчины",
-    "prepHours": 72.0,
+    "prepHours": null,
     "defrostType": "*",
     "defrostHours": 24.0,
     "storageHours": 48.0,
@@ -765,6 +797,6 @@ window.STORAGE_ITEMS = [
     "productionHours": 4.0,
     "productionLabel": "ТД = 4 часа",
     "productionPlace": "Каждый пэн (+лёд)",
-    "sourceRow": 58
+    "sourceRow": 59
   }
 ];
