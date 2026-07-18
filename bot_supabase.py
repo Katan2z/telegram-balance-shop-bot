@@ -5,11 +5,23 @@ from html import escape
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    MenuButtonWebApp,
+    Message,
+    WebAppInfo,
+)
 
 import supabase_storage as db
 
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
+MINI_APP_RELEASE = os.getenv("MINI_APP_RELEASE", "20260718-profile2")
+MINI_APP_URL = os.getenv(
+    "MINI_APP_URL",
+    f"https://katan2z.github.io/telegram-balance-shop-bot/?v={MINI_APP_RELEASE}",
+)
 ROOT_ADMINS = {818748106, 747818163, 5311640125}
 ADMIN_STATES = {}
 TASK_NOTIFY_CHAT_TITLE = os.getenv("TASK_NOTIFY_CHAT_TITLE", "Администрация нбучей бутербродной")
@@ -524,6 +536,13 @@ async def main():
         raise RuntimeError("Supabase не настроен")
     print("Supabase storage enabled")
     bot = Bot(token=token)
+    await bot.set_chat_menu_button(
+        menu_button=MenuButtonWebApp(
+            text="Спасибки",
+            web_app=WebAppInfo(url=MINI_APP_URL),
+        )
+    )
+    print(f"Mini App menu updated: {MINI_APP_URL}")
     dp = Dispatcher()
     dp.include_router(router)
     asyncio.create_task(notify_new_tasks_loop(bot))
