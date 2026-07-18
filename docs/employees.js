@@ -13,7 +13,7 @@ function emp2ErrorText(error) {
 }
 
 function emp2Code() { return "BK8-" + Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase(); }
-function emp2IsRoot() { const tg = window.Telegram?.WebApp?.initDataUnsafe?.user; const id = String(tg?.id || window.userId || (typeof userId !== "undefined" ? userId : "")); return id === "818748106"; }
+function emp2IsRoot() { return Boolean(window.BK8Permissions?.can("manageEmployees")); }
 
 function emp2Build() {
   if (!emp2IsRoot()) return;
@@ -125,7 +125,55 @@ function emp2Render() {
   emp2RenderDetails();
 }
 
-async function emp2Load() { if (!emp2IsRoot()) return; emp2Build(); emp2State.rows = await supabaseFetch("employee_profiles?select=*&order=created_at.desc&limit=300").catch(() => []); emp2Render(); }
-setTimeout(emp2Load, 800);
-setTimeout(emp2Load, 2000);
-setInterval(emp2Load, 30000);
+async function emp2Load() { if (!window.BK8Permissions?.can("manageEmployees")) return; emp2Build(); emp2State.rows = await supabaseFetch("employee_profiles?select=*&order=created_at.desc&limit=300").catch(() => []); emp2Render(); }
+window.emp2State = emp2State;
+window.addEventListener("bk8:employees-ready", () => emp2Load().catch(() => {}), { once: true });
+
+function emp2Selected() { return emp2State.rows.find(row => Number(row.id) === Number(emp2State.openedId)); }
+function emp2Panel(html) { const root = document.getElementById("emp2Subpanel"); if (root) root.innerHTML = html; }
+function emp2Placeholder(icon, title) { emp2Panel(`<div class="employee-admin-subcard"><div class="employee-module-icon">${icon}</div><h3>${emp2Escape(title)}</h3></div>`); }
+function emp2ShowProfile() { const row = emp2Selected(); if (row) emp2Fill(row); }
+function emp2ShowPvv() { emp2Placeholder("📄", "Бланк ПВВ"); }
+function emp2ShowKlokr() { emp2Placeholder("🏆", "КЛОКР"); }
+function emp2ShowPurchases() { emp2Placeholder("🛒", "Покупки"); }
+function emp2ShowSettings() { emp2Placeholder("⚙️", "Настройки"); }
+
+async function emp2ShowMedical() {
+  const row = emp2Selected();
+  if (!row) return;
+  const records = await supabaseFetch(`employee_medical_records?employee_profile_id=eq.${Number(row.id)}&select=*&limit=1`).catch(() => []);
+  const record = records?.[0] || {};
+  const field = (label, id, value) => `<label class="employee-medical-field"><span>${label}</span><input id="${id}" type="date" value="${emp2Escape(value || "")}"></label>`;
+  emp2Panel(`<div class="employee-admin-subcard employee-medical-card"><h3>🩺 Сан справка</h3><div class="employee-medical-grid">
+    ${field("Санитарная справка до", "medicalCertificate", record.sanitary_certificate_expires_on)}
+    ${field("Санминимум до", "medicalMinimum", record.sanitary_minimum_expires_on)}
+    ${field("Флюорография до", "medicalFluoro", record.fluorography_expires_on)}
+  </div><button id="medicalSave" class="action-btn add">Сохранить</button><p id="medicalStatus" class="employee-status"></p></div>`);
+  document.getElementById("medicalSave").onclick = async () => {
+    await supabaseWrite("employee_medical_records?on_conflict=employee_profile_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ employee_profile_id: Number(row.id), sanitary_certificate_expires_on: document.getElementById("medicalCertificate").value || null, sanitary_minimum_expires_on: document.getElementById("medicalMinimum").value || null, fluorography_expires_on: document.getElementById("medicalFluoro").value || null, updated_at: new Date().toISOString() }) });
+    document.getElementById("medicalStatus").textContent = "Сохранено.";
+  };
+}
+
+async function emp2ShowTimesheet(profileId) {
+  const rows = await supabaseFetch(`employee_timesheets?employee_profile_id=eq.${Number(profileId)}&period=eq.current&select=hours,updated_at&limit=1`).catch(() => []);
+  const row = rows?.[0];
+  const hours = row ? `${Number(row.hours || 0).toString().replace(".", ",")} ч.` : "—";
+  emp2Panel(`<div class="employee-admin-subcard employee-current-hours"><h3>🕒 Табель</h3><strong>${emp2Escape(hours)}</strong><p>Актуальные часы</p></div>`);
+}
+
+async function emp2DeleteEmployee(id) {
+  const row = emp2Selected();
+  if (!confirm(`Удалить ${row?.full_name || "сотрудника"}?`)) return;
+  await supabaseWrite(`employee_profiles?id=eq.${Number(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+  emp2State.openedId = null;
+  await emp2Load();
+}
+
+emp2RenderDetails = function () {
+  const root = document.getElementById("emp2Details");
+  const row = emp2Selected();
+  if (!root || !row) { if (root) root.innerHTML = ""; return; }
+  root.innerHTML = `<article class="employee-admin-card"><div class="employee-admin-head"><div class="employee-v2-avatar big">${emp2Escape(initials(row.full_name || "BK"))}</div><div><p class="label">Карточка сотрудника</p><h3>${emp2Escape(row.full_name || "Сотрудник")}</h3><span>${emp2Escape(row.position || "Должность не указана")}</span></div></div>
+  <div class="employee-admin-grid employee-final-menu"><button onclick="emp2ShowProfile()">👤 Профиль</button><button onclick="emp2ShowMedical()">🩺 Сан справка</button><button onclick="emp2ShowPvv()">📄 Бланк ПВВ</button><button onclick="emp2ShowTimesheet(${Number(row.id)})">🕒 Табель</button><button onclick="emp2ShowKlokr()">🏆 КЛОКР</button><button onclick="emp2ShowPurchases()">🛒 Покупки</button><button onclick="emp2ShowSettings()">⚙️ Настройки</button><button class="employee-delete-action" onclick="emp2DeleteEmployee(${Number(row.id)})">🗑 Удалить сотрудника</button></div><div id="emp2Subpanel"></div></article>`;
+};

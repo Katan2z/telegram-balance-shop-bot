@@ -72,28 +72,6 @@ function myProfileAddHomeCard() {
   }
 }
 
-async function myProfileCreateAdminProfile() {
-  const nameInput = document.getElementById("myProfileAdminName");
-  const status = document.getElementById("myProfileAdminStatus");
-  const fullName = String(nameInput?.value || "").trim().replace(/\s+/g, " ");
-  if (!fullName || fullName.split(/\s+/).length < 2) {
-    if (status) status.textContent = "Введи ФИО полностью.";
-    return;
-  }
-  const id = myProfileUserId();
-  try {
-    await myProfileFetch("employee_profiles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ telegram_id: Number(id), full_name: fullName, position: "Админ", activation_status: "active", activation_code: "ADMIN-818748106", created_by: Number(id), created_at: new Date().toISOString(), activated_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
-    });
-    if (status) status.textContent = "Профиль создан.";
-    await myProfileLoad();
-  } catch (e) {
-    if (status) status.textContent = "Не получилось создать профиль.";
-  }
-}
-
 function myProfileShowHours() {
   const root = document.getElementById("profileActionContent");
   if (!root) return;
@@ -116,9 +94,7 @@ function myProfileRender() {
   const hours = myProfileState.timesheet ? myProfileHoursText(myProfileState.timesheet.hours) : "—";
 
   if (!profile) {
-    root.innerHTML = myProfileIsRoot()
-      ? `<div class="profile-hero empty"><div class="profile-avatar">AD</div><div><p class="label">BK8 Staff</p><h2>Создай свой профиль</h2><p>Админ-доступ есть, но карточки сотрудника ещё нет.</p></div></div><div class="profile-action-card"><input id="myProfileAdminName" placeholder="Твоё ФИО" /><button class="action-btn add" onclick="myProfileCreateAdminProfile()">Создать мой профиль</button><p id="myProfileAdminStatus" class="employee-status"></p></div>`
-      : `<div class="profile-hero empty"><div class="profile-avatar">BK</div><div><p class="label">BK8 Staff</p><h2>Профиль не активирован</h2><p>Зарегистрируйся по коду приглашения.</p></div></div>`;
+    root.innerHTML = `<div class="profile-hero empty"><div class="profile-avatar">BK</div><div><p class="label">BK8 Staff</p><h2>Профиль не активирован</h2><p>Зарегистрируйся по коду приглашения.</p></div></div>`;
     return;
   }
 
@@ -152,7 +128,3 @@ async function myProfileLoad() {
   myProfileRender();
   myProfileAddHomeCard();
 }
-
-setTimeout(myProfileLoad, 900);
-setTimeout(myProfileLoad, 2200);
-setInterval(myProfileLoad, 30000);

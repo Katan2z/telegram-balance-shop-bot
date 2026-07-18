@@ -12,26 +12,6 @@ from timesheet_import import format_hours, parse_timesheet
 priority_router = Router()
 
 
-def disable_legacy_user_autoregistration():
-    """Use employee code activation as the only source of users."""
-
-    def ignore_telegram_user(*_args, **_kwargs):
-        return None
-
-    app.ROOT_ADMINS = {818748106}
-    app.db.upsert_user = ignore_telegram_user
-
-    blocked_handlers = {"new_members_handler"}
-    app.router.message.handlers[:] = [
-        handler
-        for handler in app.router.message.handlers
-        if getattr(handler.callback, "__name__", "") not in blocked_handlers
-    ]
-
-
-disable_legacy_user_autoregistration()
-
-
 def timesheet_profiles():
     return app.db.request(
         "GET",

@@ -77,16 +77,6 @@ def upsert_user_record(record: dict) -> dict:
     return rows[0] if rows else payload
 
 
-def upsert_user(user) -> dict:
-    payload = {"telegram_id": user.id, "username": user.username, "first_name": user.first_name, "last_name": user.last_name, "updated_at": now()}
-    rows = request("POST", "users?on_conflict=telegram_id", headers=headers("resolution=merge-duplicates,return=representation"), json=payload)
-    return rows[0] if rows else payload
-
-
-def upsert_unknown_user(user_id: int) -> None:
-    request("POST", "users?on_conflict=telegram_id", headers=headers("resolution=merge-duplicates"), json={"telegram_id": user_id, "updated_at": now()})
-
-
 def save_chat(chat) -> None:
     if chat.type == "private":
         return
@@ -127,8 +117,9 @@ def auto_convert_user_balance(user_id: int) -> dict:
 def change_balance(user_id: int, amount: int, admin_id: int | None = None, comment: str = "") -> int:
     if amount == 0:
         raise ValueError("Сумма не может быть 0")
-    upsert_unknown_user(user_id)
     user_rows = request("GET", f"users?telegram_id=eq.{user_id}&select=balance")
+    if not user_rows:
+        raise ValueError("Сотрудник не активирован")
     current_balance = int(user_rows[0].get("balance", 0)) if user_rows else 0
     if current_balance + amount < 0:
         raise ValueError("Недостаточно средств")
@@ -173,7 +164,9 @@ def manager_ids() -> set[int]:
 
 
 def add_manager(user_id: int, created_by: int | None = None) -> None:
-    upsert_unknown_user(user_id)
+    user_rows = request("GET", f"users?telegram_id=eq.{user_id}&select=telegram_id&limit=1") or []
+    if not user_rows:
+        raise ValueError("Менеджером может стать только активированный сотрудник")
     payload = {"telegram_id": user_id, "created_by": created_by, "created_at": now()}
     request("POST", "managers?on_conflict=telegram_id", headers=headers("resolution=merge-duplicates"), json=payload)
 

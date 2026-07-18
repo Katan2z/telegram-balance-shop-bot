@@ -36,46 +36,16 @@ function loadStyleOnce(href) {
   document.head.appendChild(link);
 }
 
-function loadEmployeeRegistrationScripts() {
-  if (window.__employeeScriptsLoading) return;
-  window.__employeeScriptsLoading = true;
-  const scripts = ["employee-core.js?v=7", "employee-activate.js?v=7", "employee-loader.js?v=7"];
-  let chain = Promise.resolve();
-  scripts.forEach(src => chain = chain.then(() => loadScriptOnce(src)));
+async function initializeAccess() {
+  const permissions = window.BK8Permissions;
+  if (permissions && !permissions.state.loaded) await permissions.load();
+  navCleanQuickActions();
+  document.dispatchEvent(new CustomEvent("bk8:app-ready"));
+  window.dispatchEvent(new CustomEvent("bk8:app-ready"));
+  if (permissions?.can("manageEmployees")) window.dispatchEvent(new CustomEvent("bk8:employees-ready"));
+  if (typeof myProfileLoad === "function") myProfileLoad().catch(() => {});
+  if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
 }
 
-function loadEmployeesSection() {
-  if (window.__bk8EmployeesSectionLoading) return;
-  window.__bk8EmployeesSectionLoading = true;
-  loadStyleOnce("employees.css?v=6");
-  loadScriptOnce("employees.js?v=4")
-    .then(() => loadScriptOnce("employee-state-bridge.js?v=2"))
-    .then(() => loadScriptOnce("employees-remove.js?v=1"))
-    .then(() => loadScriptOnce("employee-card-menu.js?v=3"))
-    .then(() => loadScriptOnce("employee-medical.js?v=3"))
-    .then(() => {
-      if (typeof emp2Load === "function") emp2Load();
-      if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
-    })
-    .finally(() => {
-      window.__bk8EmployeesSectionLoading = false;
-    });
-}
-
-function loadMyProfileSection() {
-  loadStyleOnce("my-profile.css?v=5");
-  loadScriptOnce("my-profile.js?v=5").then(() => {
-    loadScriptOnce("my-profile-hours-fix.js?v=1");
-    loadScriptOnce("my-profile-hours-view.js?v=1");
-    if (typeof myProfileLoad === "function") myProfileLoad();
-    if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
-  });
-}
-
-setTimeout(navCleanQuickActions, 400);
-setTimeout(navCleanQuickActions, 1200);
-setInterval(navCleanQuickActions, 2000);
-setTimeout(loadEmployeeRegistrationScripts, 500);
-setTimeout(loadEmployeesSection, 700);
-setTimeout(loadMyProfileSection, 800);
-setTimeout(loadMyProfileSection, 2400);
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initializeAccess, { once: true });
+else initializeAccess();
