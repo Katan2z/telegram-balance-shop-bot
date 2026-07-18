@@ -127,7 +127,10 @@ function emp2Render() {
 
 async function emp2Load() { if (!window.BK8Permissions?.can("manageEmployees")) return; emp2Build(); emp2State.rows = await supabaseFetch("employee_profiles?select=*&order=created_at.desc&limit=300").catch(() => []); emp2Render(); }
 window.emp2State = emp2State;
-window.addEventListener("bk8:employees-ready", () => emp2Load().catch(() => {}), { once: true });
+window.addEventListener("bk8:employees-ready", async () => {
+  await emp2Load().catch(() => {});
+  await emp2LoadMedicalAlerts().catch(() => {});
+}, { once: true });
 
 function emp2Selected() { return emp2State.rows.find(row => Number(row.id) === Number(emp2State.openedId)); }
 function emp2Panel(html) { const root = document.getElementById("emp2Subpanel"); if (root) root.innerHTML = html; }
@@ -138,12 +141,83 @@ function emp2ShowKlokr() { emp2Placeholder("🏆", "КЛОКР"); }
 function emp2ShowPurchases() { emp2Placeholder("🛒", "Покупки"); }
 function emp2ShowSettings() { emp2Placeholder("⚙️", "Настройки"); }
 
+const EMP2_MEDICAL_WARNING_DAYS = 30;
+const emp2MedicalFields = [
+  ["sanitary_certificate_expires_on", "Санитарная справка"],
+  ["sanitary_minimum_expires_on", "Санминимум"],
+  ["fluorography_expires_on", "Флюорография"],
+];
+
+function emp2MedicalDaysLeft(value) {
+  if (!value) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+}
+
+function emp2MedicalStatus(days) {
+  if (days < 0) return { className: "is-expired", text: `Просрочено на ${Math.abs(days)} дн.` };
+  if (days === 0) return { className: "is-expired", text: "Истекает сегодня" };
+  return { className: "is-warning", text: `Осталось ${days} дн.` };
+}
+
+function emp2EnsureMedicalAlertsCard() {
+  if (!window.BK8Permissions?.can("manageEmployeeDocuments")) return null;
+  const grid = document.querySelector("#tab-home .grid");
+  if (!grid) return null;
+  let card = document.getElementById("employeeMedicalAlertsCard");
+  if (!card) {
+    grid.insertAdjacentHTML("afterbegin", `<article class="card employee-medical-alerts" id="employeeMedicalAlertsCard"><div class="employee-medical-alerts-head"><div><p class="label">Контроль документов</p><h2>🩺 Сан справки</h2></div><button class="tasks-refresh" id="employeeMedicalAlertsRefresh" type="button">Обновить</button></div><div id="employeeMedicalAlertsList" class="employee-medical-alerts-list"><p class="muted">Загрузка…</p></div></article>`);
+    card = document.getElementById("employeeMedicalAlertsCard");
+    document.getElementById("employeeMedicalAlertsRefresh").onclick = () => emp2LoadMedicalAlerts().catch(() => {});
+  }
+  return card;
+}
+
+async function emp2LoadMedicalAlerts() {
+  if (!emp2EnsureMedicalAlertsCard()) return;
+  const root = document.getElementById("employeeMedicalAlertsList");
+  const [profiles, records] = await Promise.all([
+    supabaseFetch("employee_profiles?activation_status=eq.active&select=id,full_name"),
+    supabaseFetch("employee_medical_records?select=employee_profile_id,sanitary_certificate_expires_on,sanitary_minimum_expires_on,fluorography_expires_on"),
+  ]);
+  const names = new Map((profiles || []).map(profile => [Number(profile.id), profile.full_name || "Сотрудник"]));
+  const alerts = [];
+  (records || []).forEach(record => emp2MedicalFields.forEach(([key, label]) => {
+    if (!names.has(Number(record.employee_profile_id))) return;
+    const days = emp2MedicalDaysLeft(record[key]);
+    if (days === null || days > EMP2_MEDICAL_WARNING_DAYS) return;
+    alerts.push({ profileId: Number(record.employee_profile_id), name: names.get(Number(record.employee_profile_id)) || "Сотрудник", label, date: record[key], days });
+  }));
+  alerts.sort((a, b) => a.days - b.days || a.name.localeCompare(b.name, "ru"));
+  if (!alerts.length) {
+    root.innerHTML = `<div class="employee-medical-alerts-ok"><strong>Всё в порядке</strong><span>В ближайшие ${EMP2_MEDICAL_WARNING_DAYS} дней документы не истекают.</span></div>`;
+    return;
+  }
+  root.innerHTML = alerts.map(alert => {
+    const status = emp2MedicalStatus(alert.days);
+    return `<button class="employee-medical-alert ${status.className}" type="button" onclick="emp2OpenFromMedicalAlert(${alert.profileId})"><span><strong>${emp2Escape(alert.name)}</strong><small>${emp2Escape(alert.label)} · до ${emp2Escape(alert.date)}</small></span><b>${emp2Escape(status.text)}</b></button>`;
+  }).join("");
+}
+
+function emp2OpenFromMedicalAlert(profileId) {
+  if (typeof switchTab === "function") switchTab("employees");
+  emp2Open(profileId);
+  emp2ShowMedical().catch(() => {});
+}
+
 async function emp2ShowMedical() {
   const row = emp2Selected();
   if (!row) return;
   const records = await supabaseFetch(`employee_medical_records?employee_profile_id=eq.${Number(row.id)}&select=*&limit=1`).catch(() => []);
   const record = records?.[0] || {};
-  const field = (label, id, value) => `<label class="employee-medical-field"><span>${label}</span><input id="${id}" type="date" value="${emp2Escape(value || "")}"></label>`;
+  const field = (label, id, value) => {
+    const days = emp2MedicalDaysLeft(value);
+    const status = days === null ? "Дата не указана" : emp2MedicalStatus(days).text;
+    return `<label class="employee-medical-field"><span>${label}</span><input id="${id}" type="date" value="${emp2Escape(value || "")}"><small>${emp2Escape(status)}</small></label>`;
+  };
   emp2Panel(`<div class="employee-admin-subcard employee-medical-card"><h3>🩺 Сан справка</h3><div class="employee-medical-grid">
     ${field("Санитарная справка до", "medicalCertificate", record.sanitary_certificate_expires_on)}
     ${field("Санминимум до", "medicalMinimum", record.sanitary_minimum_expires_on)}
@@ -152,7 +226,14 @@ async function emp2ShowMedical() {
   document.getElementById("medicalSave").onclick = async () => {
     await supabaseWrite("employee_medical_records?on_conflict=employee_profile_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ employee_profile_id: Number(row.id), sanitary_certificate_expires_on: document.getElementById("medicalCertificate").value || null, sanitary_minimum_expires_on: document.getElementById("medicalMinimum").value || null, fluorography_expires_on: document.getElementById("medicalFluoro").value || null, updated_at: new Date().toISOString() }) });
     document.getElementById("medicalStatus").textContent = "Сохранено.";
+    await emp2LoadMedicalAlerts();
   };
+  ["medicalCertificate", "medicalMinimum", "medicalFluoro"].forEach(id => {
+    document.getElementById(id).onchange = event => {
+      const days = emp2MedicalDaysLeft(event.target.value);
+      event.target.parentElement.querySelector("small").textContent = days === null ? "Дата не указана" : emp2MedicalStatus(days).text;
+    };
+  });
 }
 
 async function emp2ShowTimesheet(profileId) {
