@@ -109,7 +109,7 @@ function scheduleRenderControls() {
     <select id="scheduleWeekSelect" aria-label="Неделя">${options}</select>
     <button type="button" id="scheduleNextWeek">Следующая неделя</button>
     <button type="button" id="scheduleRefresh">Обновить</button>
-    ${payload.is_admin ? '<button type="button" class="schedule-primary" id="scheduleSaveAll">Сохранить всё</button><button type="button" id="scheduleCopyAvailability">Перенести возможности</button><button type="button" class="schedule-publish" id="schedulePublish">Опубликовать</button><button type="button" id="scheduleExcel">Скачать Excel</button>' : ""}
+    ${payload.is_admin ? '<button type="button" class="schedule-primary" id="scheduleSaveAll">Сохранить всё</button><button type="button" id="scheduleCopyAvailability">Перенести возможности</button><button type="button" class="schedule-publish" id="scheduleOpenInput">Открыть сотрудникам</button><button type="button" id="scheduleCloseInput">Закрыть сотрудникам</button><button type="button" class="schedule-publish" id="schedulePublish">Опубликовать</button><button type="button" id="scheduleExcel">Скачать Excel</button>' : ""}
   `;
   document.getElementById("scheduleWeekSelect").onchange = event => scheduleLoad(event.target.value);
   document.getElementById("scheduleNextWeek").onclick = () => scheduleLoad(scheduleNextMonday());
@@ -117,6 +117,8 @@ function scheduleRenderControls() {
   if (payload.is_admin) {
     document.getElementById("scheduleSaveAll").onclick = scheduleSaveAll;
     document.getElementById("scheduleCopyAvailability").onclick = scheduleCopyAvailability;
+    document.getElementById("scheduleOpenInput").onclick = () => scheduleSetInputAccess(true);
+    document.getElementById("scheduleCloseInput").onclick = () => scheduleSetInputAccess(false);
     document.getElementById("schedulePublish").onclick = schedulePublish;
     document.getElementById("scheduleExcel").onclick = scheduleExportExcel;
   }
@@ -127,7 +129,9 @@ function scheduleRenderMeta() {
   const week = scheduleState.payload?.week;
   if (!meta || !week) return;
   const deadline = new Date(week.submission_deadline).toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  meta.innerHTML = `<span>Неделя: ${scheduleEscape(scheduleWeekText(week.week_start))}</span><span>Приём до: ${scheduleEscape(deadline)} МСК</span><span>${week.status === "published" ? "✅ Опубликовано" : scheduleState.payload.can_submit ? "🟢 Приём открыт" : "🔒 Приём закрыт"}</span>`;
+  const employeeOpen = scheduleState.payload.employee_can_submit ?? (week.status === "collecting" && Date.now() <= new Date(week.submission_deadline).getTime());
+  const accessText = week.employee_input_override === true ? "🟢 Открыто админом" : week.employee_input_override === false ? "🔒 Закрыто админом" : employeeOpen ? "🟢 Приём открыт автоматически" : "🔒 Приём закрыт автоматически";
+  meta.innerHTML = `<span>Неделя: ${scheduleEscape(scheduleWeekText(week.week_start))}</span><span>Приём до: ${scheduleEscape(deadline)} МСК</span><span>${accessText}</span>${week.status === "published" ? "<span>✅ Опубликовано</span>" : ""}`;
 }
 
 function scheduleDayLabel(key, index) {
@@ -216,6 +220,15 @@ async function schedulePublish() {
     await scheduleSaveAll();
     await scheduleRpc("schedule_publish_week", { p_actor_id: Number(userId), p_week_start: scheduleState.weekStart });
     scheduleSetStatus("Расписание опубликовано.", true);
+    await scheduleLoad(scheduleState.weekStart);
+  } catch (error) { scheduleSetStatus(error.message); }
+}
+
+async function scheduleSetInputAccess(open) {
+  try {
+    scheduleSetStatus(open ? "Открываем заполнение сотрудникам..." : "Закрываем заполнение сотрудникам...");
+    await scheduleRpc("schedule_set_input_access", { p_actor_id: Number(userId), p_week_start: scheduleState.weekStart, p_open: Boolean(open) });
+    scheduleSetStatus(open ? "Заполнение открыто для сотрудников." : "Заполнение закрыто для сотрудников.", true);
     await scheduleLoad(scheduleState.weekStart);
   } catch (error) { scheduleSetStatus(error.message); }
 }

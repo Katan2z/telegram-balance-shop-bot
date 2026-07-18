@@ -7,10 +7,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_app_exposes_telegram_user_id_to_modules(self):
+        source = (ROOT / "docs" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("window.userId = userId", source)
+
     def test_deadline_is_previous_wednesday_moscow_time(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_employee_schedule.sql").read_text(encoding="utf-8")
         self.assertIn("(p_week_start - 5) + time '23:59'", migration)
         self.assertIn("at time zone 'Europe/Moscow'", migration)
+
+    def test_launch_week_has_sunday_deadline_exception(self):
+        migration = (ROOT / "docs" / "migrations" / "20260718_schedule_deadline_exception.sql").read_text(encoding="utf-8")
+        self.assertIn("p_week_start = date '2026-07-20'", migration)
+        self.assertIn("date '2026-07-19' + time '23:59'", migration)
+        self.assertIn("else ((p_week_start - 5) + time '23:59')", migration)
+
+    def test_admin_can_open_and_close_employee_input(self):
+        migration = (ROOT / "docs" / "migrations" / "20260718_schedule_manual_access.sql").read_text(encoding="utf-8")
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        self.assertIn("employee_input_override boolean", migration)
+        self.assertIn("schedule_set_input_access", migration)
+        self.assertIn("Открыть сотрудникам", source)
+        self.assertIn("Закрыть сотрудникам", source)
 
     def test_employee_cannot_edit_another_profile(self):
         migration = (ROOT / "docs" / "migrations" / "20260718_employee_schedule.sql").read_text(encoding="utf-8")
