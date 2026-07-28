@@ -1,6 +1,10 @@
 import unittest
 from datetime import datetime, timezone
 import schedule_reminders as reminders
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScheduleReminderTests(unittest.TestCase):
@@ -25,6 +29,12 @@ class ScheduleReminderTests(unittest.TestCase):
         saved = "2026-07-28T08:00:00+00:00"
         self.assertFalse(reminders.reminder_is_due(saved, datetime(2026, 7, 28, 11, 59, tzinfo=timezone.utc)))
         self.assertTrue(reminders.reminder_is_due(saved, datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)))
+
+    def test_manual_command_does_not_reset_automatic_timer(self):
+        source = (ROOT / "bot_supabase.py").read_text(encoding="utf-8")
+        self.assertIn('@router.message(Command("raspes"))', source)
+        self.assertIn("record_send=False", source)
+        self.assertIn("if record_send:\n        db.set_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY", source)
 
 
 if __name__ == "__main__":
