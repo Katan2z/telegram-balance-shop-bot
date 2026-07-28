@@ -47,3 +47,25 @@ def reminder_text(week_start: str, employees: list[dict]) -> str:
         "",
         "Откройте Mini App → Расписание.",
     ])
+
+
+def announcement_messages(text: str, employees: list[dict], limit: int = 4000) -> list[str]:
+    heading = f"📣 <b>{escape(text.strip())}</b>"
+    mentions = [
+        f'<a href="tg://user?id={int(employee["telegram_id"])}">{escape(str(employee.get("full_name") or "Сотрудник"))}</a>'
+        for employee in employees
+        if employee.get("telegram_id") is not None
+    ]
+    if not mentions:
+        return [heading]
+    messages = []
+    current = heading
+    for mention in mentions:
+        addition = f"\n\n{mention}" if current == heading else f"\n{mention}"
+        if len(current) + len(addition) > limit:
+            messages.append(current)
+            current = mention
+        else:
+            current += addition
+    messages.append(current)
+    return messages
