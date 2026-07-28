@@ -75,6 +75,7 @@ async def main():
     dp.include_router(priority_router)
     dp.include_router(app.router)
     asyncio.create_task(app.notify_new_tasks_loop(bot))
+    asyncio.create_task(app.schedule_reminder_loop(bot))
     asyncio.create_task(app.monthly_reset_loop(bot))
     await dp.start_polling(bot)
 

@@ -1,6 +1,6 @@
 import asyncio
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html import escape
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -15,6 +15,7 @@ from aiogram.types import (
 )
 
 import supabase_storage as db
+import schedule_reminders as reminders
 
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
 MINI_APP_RELEASE = os.getenv("MINI_APP_RELEASE", "20260718-schedule5")
@@ -26,6 +27,8 @@ ROOT_ADMINS = {818748106, 747818163, 5311640125}
 ADMIN_STATES = {}
 TASK_NOTIFY_CHAT_TITLE = os.getenv("TASK_NOTIFY_CHAT_TITLE", "Администрация нбучей бутербродной")
 TASK_NOTIFY_SETTING_KEY = "task_notify_chat_id"
+SCHEDULE_NOTIFY_SETTING_KEY = "schedule_notify_chat_id"
+SCHEDULE_NOTIFY_LAST_SENT_KEY = "schedule_notify_last_sent_at"
 MOSCOW_OFFSET = timedelta(hours=3)
 router = Router()
 
@@ -256,6 +259,85 @@ def get_task_notify_chat_id():
     return None
 
 
+def schedule_target_week(local_now: datetime | None = None) -> str:
+    return reminders.target_week(local_now or moscow_now())
+
+
+def schedule_reminder_is_due(now_utc: datetime | None = None) -> bool:
+    return reminders.reminder_is_due(db.get_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY), now_utc)
+
+
+def is_management_profile(profile: dict, manager_ids: set[int] | None = None) -> bool:
+    return reminders.is_management_profile(profile, root_admin_ids(), manager_ids)
+
+
+def schedule_missing_employees(week_id: int) -> list[dict]:
+    profiles = db.request(
+        "GET",
+        "employee_profiles?activation_status=eq.active&telegram_id=not.is.null"
+        "&select=id,full_name,position,telegram_id&order=full_name.asc",
+    ) or []
+    entries = db.request(
+        "GET",
+        f"schedule_entries?week_id=eq.{int(week_id)}&submitted_at=not.is.null&select=employee_profile_id",
+    ) or []
+    submitted_ids = {int(row["employee_profile_id"]) for row in entries if row.get("employee_profile_id") is not None}
+    managers = db.manager_ids()
+    return [
+        profile for profile in profiles
+        if int(profile["id"]) not in submitted_ids and not is_management_profile(profile, managers)
+    ]
+
+
+def schedule_reminder_text(week_start: str, employees: list[dict]) -> str:
+    return reminders.reminder_text(week_start, employees)
+
+
+def schedule_open_week(week_start: str) -> dict | None:
+    actor_id = 818748106
+    db.request("POST", "rpc/schedule_ensure_week", json={"p_actor_id": actor_id, "p_week_start": week_start})
+    rows = db.request(
+        "GET",
+        f"schedule_weeks?week_start=eq.{week_start}"
+        "&select=id,week_start,status,submission_deadline,employee_input_override&limit=1",
+    ) or []
+    if not rows:
+        return None
+    week = rows[0]
+    override = week.get("employee_input_override")
+    deadline = datetime.fromisoformat(str(week["submission_deadline"]).replace("Z", "+00:00"))
+    automatically_open = week.get("status") == "collecting" and datetime.now(timezone.utc) <= deadline
+    return week if (bool(override) if override is not None else automatically_open) else None
+
+
+async def send_schedule_reminder(bot: Bot, force: bool = False) -> bool:
+    saved_chat = db.get_setting(SCHEDULE_NOTIFY_SETTING_KEY)
+    if not saved_chat or not saved_chat.lstrip("-").isdigit():
+        return False
+    if not force and not schedule_reminder_is_due():
+        return False
+    week_start = schedule_target_week()
+    week = schedule_open_week(week_start)
+    if not week:
+        return False
+    missing = schedule_missing_employees(int(week["id"]))
+    if not missing:
+        return False
+    await bot.send_message(int(saved_chat), schedule_reminder_text(week_start, missing), parse_mode="HTML")
+    db.set_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY, datetime.now(timezone.utc).isoformat())
+    return True
+
+
+async def schedule_reminder_loop(bot: Bot):
+    await asyncio.sleep(10)
+    while True:
+        try:
+            await send_schedule_reminder(bot)
+        except Exception as error:
+            print(f"Schedule reminder loop error: {error}")
+        await asyncio.sleep(300)
+
+
 async def notify_new_tasks_loop(bot: Bot):
     await asyncio.sleep(5)
     while True:
@@ -362,6 +444,27 @@ async def uved_command(message: Message):
         db.save_chat(message.chat)
         db.set_setting(TASK_NOTIFY_SETTING_KEY, str(message.chat.id))
     await answer(message, f"✅ Уведомления о новых задачах будут приходить в эту беседу.\nЧат: {message.chat.title or message.chat.id}")
+
+
+@router.message(Command("uved_chbr"))
+async def uved_chbr_command(message: Message, bot: Bot):
+    if message.chat.type == "private":
+        await answer(message, "Эту команду нужно отправить в группе сотрудников.")
+        return
+    if not message.from_user or message.from_user.id not in root_admin_ids():
+        await answer(message, "⛔ Команда доступна только главному администратору.")
+        return
+    db.save_chat(message.chat)
+    db.set_setting(SCHEDULE_NOTIFY_SETTING_KEY, str(message.chat.id))
+    await answer(
+        message,
+        "✅ Напоминания о расписании включены в этой группе.\n"
+        "Бот будет отмечать не заполнивших сотрудников каждые 4 часа, пока приём открыт.",
+    )
+    try:
+        await send_schedule_reminder(bot, force=True)
+    except Exception as error:
+        print(f"Initial schedule reminder error: {error}")
 
 
 @router.message(Command("admin"))
@@ -546,6 +649,7 @@ async def main():
     dp = Dispatcher()
     dp.include_router(router)
     asyncio.create_task(notify_new_tasks_loop(bot))
+    asyncio.create_task(schedule_reminder_loop(bot))
     asyncio.create_task(monthly_reset_loop(bot))
     await dp.start_polling(bot)
 
