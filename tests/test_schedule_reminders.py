@@ -36,6 +36,12 @@ class ScheduleReminderTests(unittest.TestCase):
         self.assertIn("record_send=False", source)
         self.assertIn("if record_send:\n        db.set_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY", source)
 
+    def test_bot_reads_schedule_through_public_rpc(self):
+        source = (ROOT / "bot_supabase.py").read_text(encoding="utf-8")
+        self.assertIn('"rpc/schedule_get_week"', source)
+        self.assertNotIn('"schedule_entries?week_id=', source)
+        self.assertNotIn('"schedule_weeks?week_start=', source)
+
 
 if __name__ == "__main__":
     unittest.main()
