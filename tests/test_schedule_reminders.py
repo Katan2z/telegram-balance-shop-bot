@@ -42,6 +42,31 @@ class ScheduleReminderTests(unittest.TestCase):
         self.assertNotIn('"schedule_entries?week_id=', source)
         self.assertNotIn('"schedule_weeks?week_start=', source)
 
+    def test_topic_is_saved_and_reused(self):
+        source = (ROOT / "bot_supabase.py").read_text(encoding="utf-8")
+        self.assertIn('SCHEDULE_NOTIFY_THREAD_SETTING_KEY = "schedule_notify_thread_id"', source)
+        self.assertIn("str(message.message_thread_id or 0)", source)
+        self.assertIn("message_thread_id=message.message_thread_id", source)
+
+    def test_announcement_escapes_text_and_mentions_every_employee(self):
+        messages = reminders.announcement_messages(
+            "Сбор <сейчас>",
+            [
+                {"telegram_id": 1, "full_name": "Первый"},
+                {"telegram_id": 2, "full_name": "Второй"},
+            ],
+        )
+        result = "\n".join(messages)
+        self.assertIn("Сбор &lt;сейчас&gt;", result)
+        self.assertIn('tg://user?id=1', result)
+        self.assertIn('tg://user?id=2', result)
+
+    def test_announcement_is_split_before_telegram_limit(self):
+        employees = [{"telegram_id": index, "full_name": "Сотрудник " + ("я" * 40)} for index in range(1, 80)]
+        messages = reminders.announcement_messages("Объявление", employees, limit=500)
+        self.assertGreater(len(messages), 1)
+        self.assertTrue(all(len(message) <= 500 for message in messages))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -28,6 +28,7 @@ ADMIN_STATES = {}
 TASK_NOTIFY_CHAT_TITLE = os.getenv("TASK_NOTIFY_CHAT_TITLE", "Администрация нбучей бутербродной")
 TASK_NOTIFY_SETTING_KEY = "task_notify_chat_id"
 SCHEDULE_NOTIFY_SETTING_KEY = "schedule_notify_chat_id"
+SCHEDULE_NOTIFY_THREAD_SETTING_KEY = "schedule_notify_thread_id"
 SCHEDULE_NOTIFY_LAST_SENT_KEY = "schedule_notify_last_sent_at"
 MOSCOW_OFFSET = timedelta(hours=3)
 router = Router()
@@ -286,6 +287,20 @@ def schedule_reminder_text(week_start: str, employees: list[dict]) -> str:
     return reminders.reminder_text(week_start, employees)
 
 
+def saved_schedule_thread_id() -> int | None:
+    saved = db.get_setting(SCHEDULE_NOTIFY_THREAD_SETTING_KEY)
+    return int(saved) if saved and saved.isdigit() and int(saved) > 0 else None
+
+
+async def send_topic_html(bot: Bot, chat_id: int, text: str, message_thread_id: int | None = None) -> None:
+    await bot.send_message(
+        chat_id,
+        text,
+        parse_mode="HTML",
+        message_thread_id=message_thread_id,
+    )
+
+
 def schedule_week_payload(week_start: str) -> dict:
     return db.request(
         "POST",
@@ -299,10 +314,14 @@ async def send_schedule_reminder(
     force: bool = False,
     chat_id: int | None = None,
     record_send: bool = True,
+    message_thread_id: int | None = None,
 ) -> bool:
-    saved_chat = str(chat_id) if chat_id is not None else db.get_setting(SCHEDULE_NOTIFY_SETTING_KEY)
+    use_saved_destination = chat_id is None
+    saved_chat = db.get_setting(SCHEDULE_NOTIFY_SETTING_KEY) if use_saved_destination else str(chat_id)
     if not saved_chat or not saved_chat.lstrip("-").isdigit():
         return False
+    if use_saved_destination:
+        message_thread_id = saved_schedule_thread_id()
     if not force and not schedule_reminder_is_due():
         return False
     week_start = schedule_target_week()
@@ -312,7 +331,12 @@ async def send_schedule_reminder(
     missing = schedule_missing_employees(payload)
     if not missing:
         return False
-    await bot.send_message(int(saved_chat), schedule_reminder_text(week_start, missing), parse_mode="HTML")
+    await send_topic_html(
+        bot,
+        int(saved_chat),
+        schedule_reminder_text(week_start, missing),
+        message_thread_id,
+    )
     if record_send:
         db.set_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY, datetime.now(timezone.utc).isoformat())
     return True
@@ -446,6 +470,7 @@ async def uved_chbr_command(message: Message, bot: Bot):
         return
     db.save_chat(message.chat)
     db.set_setting(SCHEDULE_NOTIFY_SETTING_KEY, str(message.chat.id))
+    db.set_setting(SCHEDULE_NOTIFY_THREAD_SETTING_KEY, str(message.message_thread_id or 0))
     await answer(
         message,
         "✅ Напоминания о расписании включены в этой группе.\n"
@@ -471,12 +496,39 @@ async def raspes_command(message: Message, bot: Bot):
             force=True,
             chat_id=message.chat.id,
             record_send=False,
+            message_thread_id=message.message_thread_id,
         )
         if not sent:
             await answer(message, "✅ Сейчас должников нет или приём возможностей уже закрыт.")
     except Exception as error:
         print(f"Manual schedule reminder error: {error}")
         await answer(message, "Не получилось проверить должников. Попробуй ещё раз через минуту.")
+
+
+@router.message(Command("a"))
+async def announce_all_command(message: Message, bot: Bot):
+    if message.chat.type == "private":
+        await answer(message, "Эту команду нужно отправить в группе сотрудников.")
+        return
+    if not message.from_user or message.from_user.id not in root_admin_ids():
+        await answer(message, "⛔ Команда доступна только главному администратору.")
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await answer(message, "Напиши сообщение после команды. Например: /a Собрание в 15:00")
+        return
+    employees = db.request(
+        "GET",
+        "employee_profiles?activation_status=eq.active&telegram_id=not.is.null"
+        "&select=full_name,telegram_id&order=full_name.asc",
+    ) or []
+    for text in reminders.announcement_messages(parts[1], employees):
+        await send_topic_html(
+            bot,
+            message.chat.id,
+            text,
+            message.message_thread_id,
+        )
 
 
 @router.message(Command("admin"))
