@@ -310,8 +310,13 @@ def schedule_open_week(week_start: str) -> dict | None:
     return week if (bool(override) if override is not None else automatically_open) else None
 
 
-async def send_schedule_reminder(bot: Bot, force: bool = False) -> bool:
-    saved_chat = db.get_setting(SCHEDULE_NOTIFY_SETTING_KEY)
+async def send_schedule_reminder(
+    bot: Bot,
+    force: bool = False,
+    chat_id: int | None = None,
+    record_send: bool = True,
+) -> bool:
+    saved_chat = str(chat_id) if chat_id is not None else db.get_setting(SCHEDULE_NOTIFY_SETTING_KEY)
     if not saved_chat or not saved_chat.lstrip("-").isdigit():
         return False
     if not force and not schedule_reminder_is_due():
@@ -324,7 +329,8 @@ async def send_schedule_reminder(bot: Bot, force: bool = False) -> bool:
     if not missing:
         return False
     await bot.send_message(int(saved_chat), schedule_reminder_text(week_start, missing), parse_mode="HTML")
-    db.set_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY, datetime.now(timezone.utc).isoformat())
+    if record_send:
+        db.set_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY, datetime.now(timezone.utc).isoformat())
     return True
 
 
@@ -465,6 +471,28 @@ async def uved_chbr_command(message: Message, bot: Bot):
         await send_schedule_reminder(bot, force=True)
     except Exception as error:
         print(f"Initial schedule reminder error: {error}")
+
+
+@router.message(Command("raspes"))
+async def raspes_command(message: Message, bot: Bot):
+    if message.chat.type == "private":
+        await answer(message, "Эту команду нужно отправить в группе сотрудников.")
+        return
+    if not message.from_user or message.from_user.id not in root_admin_ids():
+        await answer(message, "⛔ Команда доступна только главному администратору.")
+        return
+    try:
+        sent = await send_schedule_reminder(
+            bot,
+            force=True,
+            chat_id=message.chat.id,
+            record_send=False,
+        )
+        if not sent:
+            await answer(message, "✅ Сейчас должников нет или приём возможностей уже закрыт.")
+    except Exception as error:
+        print(f"Manual schedule reminder error: {error}")
+        await answer(message, "Не получилось проверить должников. Попробуй ещё раз через минуту.")
 
 
 @router.message(Command("admin"))
