@@ -271,21 +271,14 @@ def is_management_profile(profile: dict, manager_ids: set[int] | None = None) ->
     return reminders.is_management_profile(profile, root_admin_ids(), manager_ids)
 
 
-def schedule_missing_employees(week_id: int) -> list[dict]:
-    profiles = db.request(
-        "GET",
-        "employee_profiles?activation_status=eq.active&telegram_id=not.is.null"
-        "&select=id,full_name,position,telegram_id&order=full_name.asc",
-    ) or []
-    entries = db.request(
-        "GET",
-        f"schedule_entries?week_id=eq.{int(week_id)}&submitted_at=not.is.null&select=employee_profile_id",
-    ) or []
-    submitted_ids = {int(row["employee_profile_id"]) for row in entries if row.get("employee_profile_id") is not None}
-    managers = db.manager_ids()
+def schedule_missing_employees(payload: dict) -> list[dict]:
     return [
-        profile for profile in profiles
-        if int(profile["id"]) not in submitted_ids and not is_management_profile(profile, managers)
+        {
+            "telegram_id": entry["employee_telegram_id"],
+            "full_name": entry.get("employee_name") or "Сотрудник",
+        }
+        for entry in payload.get("entries", [])
+        if entry.get("employee_telegram_id") is not None and not entry.get("submitted_at")
     ]
 
 
@@ -293,21 +286,12 @@ def schedule_reminder_text(week_start: str, employees: list[dict]) -> str:
     return reminders.reminder_text(week_start, employees)
 
 
-def schedule_open_week(week_start: str) -> dict | None:
-    actor_id = 818748106
-    db.request("POST", "rpc/schedule_ensure_week", json={"p_actor_id": actor_id, "p_week_start": week_start})
-    rows = db.request(
-        "GET",
-        f"schedule_weeks?week_start=eq.{week_start}"
-        "&select=id,week_start,status,submission_deadline,employee_input_override&limit=1",
-    ) or []
-    if not rows:
-        return None
-    week = rows[0]
-    override = week.get("employee_input_override")
-    deadline = datetime.fromisoformat(str(week["submission_deadline"]).replace("Z", "+00:00"))
-    automatically_open = week.get("status") == "collecting" and datetime.now(timezone.utc) <= deadline
-    return week if (bool(override) if override is not None else automatically_open) else None
+def schedule_week_payload(week_start: str) -> dict:
+    return db.request(
+        "POST",
+        "rpc/schedule_get_week",
+        json={"p_actor_id": 818748106, "p_week_start": week_start},
+    ) or {}
 
 
 async def send_schedule_reminder(
@@ -322,10 +306,10 @@ async def send_schedule_reminder(
     if not force and not schedule_reminder_is_due():
         return False
     week_start = schedule_target_week()
-    week = schedule_open_week(week_start)
-    if not week:
+    payload = schedule_week_payload(week_start)
+    if not payload.get("employee_can_submit"):
         return False
-    missing = schedule_missing_employees(int(week["id"]))
+    missing = schedule_missing_employees(payload)
     if not missing:
         return False
     await bot.send_message(int(saved_chat), schedule_reminder_text(week_start, missing), parse_mode="HTML")
