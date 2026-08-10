@@ -101,6 +101,12 @@ class ScheduleTests(unittest.TestCase):
         self.assertGreaterEqual(migration.count("public.schedule_is_admin(p_actor_id)"), 2)
         self.assertIn("Only schedule managers can edit preferences", migration)
 
+    def test_regular_day_off_labels_use_russian_abbreviations(self):
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        for abbreviation in ('mon: "ПН"', 'tue: "ВТ"', 'wed: "СР"', 'thu: "ЧТ"', 'fri: "ПТ"', 'sat: "СБ"', 'sun: "ВС"'):
+            self.assertIn(abbreviation, source)
+        self.assertIn("SCHEDULE_DAY_SHORT[key]", source)
+
 
 if __name__ == "__main__":
     unittest.main()
