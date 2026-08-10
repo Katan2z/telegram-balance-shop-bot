@@ -163,6 +163,15 @@ def manager_ids() -> set[int]:
     return {int(row["telegram_id"]) for row in rows if row.get("telegram_id") is not None}
 
 
+def instructor_ids() -> set[int]:
+    try:
+        rows = request("GET", "instructors?select=telegram_id") or []
+    except RuntimeError as error:
+        print(f"Instructors table unavailable: {error}")
+        return set()
+    return {int(row["telegram_id"]) for row in rows if row.get("telegram_id") is not None}
+
+
 def add_manager(user_id: int, created_by: int | None = None) -> None:
     user_rows = request("GET", f"users?telegram_id=eq.{user_id}&select=telegram_id&limit=1") or []
     if not user_rows:
