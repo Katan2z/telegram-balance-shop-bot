@@ -2,7 +2,7 @@ const SCHEDULE_DAYS = [
   ["mon", "Понедельник"], ["tue", "Вторник"], ["wed", "Среда"],
   ["thu", "Четверг"], ["fri", "Пятница"], ["sat", "Суббота"], ["sun", "Воскресенье"],
 ];
-const scheduleState = { weekStart: "", payload: null, weeks: [] };
+const scheduleState = { weekStart: "", payload: null, weeks: [], settingsOpen: false };
 
 function scheduleConfig() {
   const config = window.APP_CONFIG || {};
@@ -110,13 +110,14 @@ function scheduleRenderControls() {
     <select id="scheduleWeekSelect" aria-label="Неделя">${options}</select>
     <button type="button" id="scheduleNextWeek">Следующая неделя</button>
     <button type="button" id="scheduleRefresh">Обновить</button>
-    ${payload.is_admin ? '<button type="button" class="schedule-primary" id="scheduleSaveAll">Сохранить всё</button><button type="button" id="scheduleCopyAvailability">Перенести возможности</button><button type="button" class="schedule-publish" id="scheduleOpenInput">Открыть сотрудникам</button><button type="button" id="scheduleCloseInput">Закрыть сотрудникам</button><button type="button" class="schedule-publish" id="schedulePublish">Опубликовать</button><button type="button" id="scheduleExcel">Скачать Excel</button>' : ""}
+    ${payload.is_admin ? '<button type="button" class="schedule-primary" id="scheduleSaveAll">Сохранить всё</button><button type="button" id="scheduleSettings">Настройки расписания</button><button type="button" id="scheduleCopyAvailability">Перенести возможности</button><button type="button" class="schedule-publish" id="scheduleOpenInput">Открыть сотрудникам</button><button type="button" id="scheduleCloseInput">Закрыть сотрудникам</button><button type="button" class="schedule-publish" id="schedulePublish">Опубликовать</button><button type="button" id="scheduleExcel">Скачать Excel</button>' : ""}
   `;
   document.getElementById("scheduleWeekSelect").onchange = event => scheduleLoad(event.target.value);
   document.getElementById("scheduleNextWeek").onclick = () => scheduleLoad(scheduleNextMonday());
   document.getElementById("scheduleRefresh").onclick = () => scheduleLoad(scheduleState.weekStart);
   if (payload.is_admin) {
     document.getElementById("scheduleSaveAll").onclick = scheduleSaveAll;
+    document.getElementById("scheduleSettings").onclick = () => { scheduleState.settingsOpen = !scheduleState.settingsOpen; scheduleRender(); };
     document.getElementById("scheduleCopyAvailability").onclick = scheduleCopyAvailability;
     document.getElementById("scheduleOpenInput").onclick = () => scheduleSetInputAccess(true);
     document.getElementById("scheduleCloseInput").onclick = () => scheduleSetInputAccess(false);
@@ -139,14 +140,60 @@ function scheduleDayLabel(key, index) {
   return `${SCHEDULE_DAYS[index][1]}<small>${scheduleDateText(scheduleAddDays(scheduleState.weekStart, index))}</small>`;
 }
 
+function scheduleIsDayOff(value) {
+  return String(value || "").toLowerCase().includes("выходн");
+}
+
+function scheduleTimeParts(value) {
+  const match = String(value || "").match(/(\d{1,2}:\d{2})\s*[—-]\s*(\d{1,2}:\d{2})/);
+  return match ? [match[1].padStart(5, "0"), match[2].padStart(5, "0")] : ["", ""];
+}
+
+function scheduleEmployeeDayMarkup(entry, key, label, index, disabled) {
+  const value = entry.availability?.[key] || (entry.regular_days_off?.[key] ? "Выходной" : "");
+  const [from, to] = scheduleTimeParts(value);
+  const permanent = Boolean(entry.regular_days_off?.[key]);
+  const used = Number(scheduleState.payload.day_off_counts?.[key] || 0);
+  const limit = Number(scheduleState.payload.max_regular_days_off || 4);
+  const dayOffBlocked = !permanent && used >= limit && !scheduleIsDayOff(entry.availability?.[key]);
+  return `<div class="schedule-day-card" data-employee-day="${key}">
+    <strong>${label}</strong><small>${scheduleDateText(scheduleAddDays(scheduleState.weekStart, index), true)}</small>
+    <div class="schedule-day-actions">
+      <button type="button" data-day-mode="work" ${disabled}>Работаю</button>
+      <button type="button" data-day-mode="off" ${disabled || dayOffBlocked ? "disabled" : ""}>Выходной</button>
+      <button type="button" data-day-mode="clear" ${disabled}>Очистить</button>
+    </div>
+    <div class="schedule-time-row" ${scheduleIsDayOff(value) || !value ? "hidden" : ""}>
+      <label>С <input type="time" data-time-from value="${scheduleEscape(from)}" ${disabled}></label>
+      <label>До <input type="time" data-time-to value="${scheduleEscape(to)}" ${disabled}></label>
+    </div>
+    <input type="hidden" data-schedule-day="${key}" value="${scheduleEscape(value)}">
+    <small class="schedule-day-choice">${permanent ? "Постоянный выходной" : dayOffBlocked ? `Лимит выходных: ${used}/${limit}` : scheduleEscape(value || "Не выбрано")}</small>
+    ${entry.final_schedule?.[key] ? `<small>Итог: ${scheduleEscape(entry.final_schedule[key])}</small>` : ""}
+  </div>`;
+}
+
 function scheduleEmployeeMarkup(entry) {
-  const values = entry.availability || {};
   const disabled = scheduleState.payload.can_submit ? "" : "disabled";
   return `<div class="schedule-employee-form">
-    ${SCHEDULE_DAYS.map(([key, label], index) => `<label class="schedule-day-card"><strong>${label}</strong><small>${scheduleDateText(scheduleAddDays(scheduleState.weekStart, index), true)}</small><textarea data-schedule-day="${key}" ${disabled} placeholder="Например: после 16:00">${scheduleEscape(values[key] || "")}</textarea>${entry.final_schedule?.[key] ? `<small>Итог: ${scheduleEscape(entry.final_schedule[key])}</small>` : ""}</label>`).join("")}
+    <div class="schedule-employee-type">Постоянный тип: <strong>${scheduleEscape(entry.work_type || "FT")}</strong></div>
+    ${SCHEDULE_DAYS.map(([key, label], index) => scheduleEmployeeDayMarkup(entry, key, label, index, disabled)).join("")}
     <label class="schedule-day-card schedule-comment-card"><strong>Комментарий</strong><textarea id="scheduleEmployeeComment" ${disabled} placeholder="Комментарий к возможностям">${scheduleEscape(entry.comment || "")}</textarea></label>
     ${scheduleState.payload.can_submit ? '<button type="button" class="schedule-primary" id="scheduleEmployeeSave">Сохранить возможности</button>' : ""}
   </div>`;
+}
+
+function scheduleSettingsMarkup(entries) {
+  if (!scheduleState.settingsOpen) return "";
+  return `<section class="schedule-settings-panel">
+    <div class="schedule-settings-head"><div><strong>Постоянные возможности</strong><small>Тип занятости и постоянные выходные</small></div><label>Лимит обычных выходных <input id="scheduleDayOffLimit" type="number" min="1" max="20" value="${Number(scheduleState.payload.max_regular_days_off || 4)}"></label></div>
+    <div class="schedule-settings-list">${entries.map(entry => `<div class="schedule-preference-row" data-preference-profile="${entry.employee_profile_id}">
+      <strong>${scheduleEscape(entry.employee_name)}</strong>
+      <select data-work-type><option ${entry.work_type === "PT1" ? "selected" : ""}>PT1</option><option ${entry.work_type === "PT2" ? "selected" : ""}>PT2</option><option ${!entry.work_type || entry.work_type === "FT" ? "selected" : ""}>FT</option></select>
+      <div class="schedule-regular-days">${SCHEDULE_DAYS.map(([key, label]) => `<label><input type="checkbox" data-regular-off="${key}" ${entry.regular_days_off?.[key] ? "checked" : ""}>${label.slice(0, 2)}</label>`).join("")}</div>
+    </div>`).join("")}</div>
+    <button type="button" class="schedule-primary" id="scheduleSaveSettings">Сохранить настройки</button>
+  </section>`;
 }
 
 function scheduleAdminMarkup(entries) {
@@ -163,14 +210,52 @@ function scheduleRender() {
   const entries = scheduleState.payload?.entries || [];
   if (!content) return;
   if (!entries.length) content.innerHTML = '<div class="schedule-empty">Для этого пользователя нет активного профиля сотрудника.</div>';
-  else content.innerHTML = scheduleState.payload.is_admin ? scheduleAdminMarkup(entries) : scheduleEmployeeMarkup(entries[0]);
+  else content.innerHTML = scheduleState.payload.is_admin ? scheduleSettingsMarkup(entries) + scheduleAdminMarkup(entries) : scheduleEmployeeMarkup(entries[0]);
   document.getElementById("scheduleEmployeeSave")?.addEventListener("click", scheduleSaveEmployee);
+  document.getElementById("scheduleSaveSettings")?.addEventListener("click", scheduleSaveSettings);
+  document.querySelectorAll("[data-employee-day]").forEach(scheduleBindEmployeeDay);
   document.querySelectorAll("[data-save-row]").forEach(button => button.onclick = () => scheduleSaveAdminRow(button.closest("tr")));
   if (typeof setupSimpleNavigation === "function") setupSimpleNavigation();
 }
 
+function scheduleBindEmployeeDay(card) {
+  const value = card.querySelector("[data-schedule-day]");
+  const choice = card.querySelector(".schedule-day-choice");
+  const times = card.querySelector(".schedule-time-row");
+  const syncTime = () => {
+    const from = card.querySelector("[data-time-from]").value;
+    const to = card.querySelector("[data-time-to]").value;
+    value.value = from && to ? `${from} — ${to}` : "";
+    choice.textContent = value.value || "Выберите начало и конец";
+  };
+  card.querySelectorAll("[data-time-from],[data-time-to]").forEach(input => input.onchange = syncTime);
+  card.querySelector('[data-day-mode="work"]')?.addEventListener("click", () => {
+    times.hidden = false;
+    const from = card.querySelector("[data-time-from]").value;
+    const to = card.querySelector("[data-time-to]").value;
+    value.value = from && to ? `${from} — ${to}` : "";
+    choice.textContent = value.value || "Выберите начало и конец";
+  });
+  card.querySelector('[data-day-mode="off"]')?.addEventListener("click", () => { times.hidden = true; value.value = "Выходной"; choice.textContent = "Выходной"; });
+  card.querySelector('[data-day-mode="clear"]')?.addEventListener("click", () => { times.hidden = true; value.value = ""; choice.textContent = "Не выбрано"; card.querySelectorAll("input[type=time]").forEach(input => input.value = ""); });
+}
+
+async function scheduleSaveSettings() {
+  try {
+    scheduleSetStatus("Сохраняем настройки расписания...");
+    const limit = Number(document.getElementById("scheduleDayOffLimit")?.value || 4);
+    await scheduleRpc("schedule_save_settings", { p_actor_id: Number(userId), p_max_regular_days_off: limit });
+    for (const row of document.querySelectorAll("[data-preference-profile]")) {
+      const days = Object.fromEntries(SCHEDULE_DAYS.map(([key]) => [key, Boolean(row.querySelector(`[data-regular-off="${key}"]`)?.checked)]));
+      await scheduleRpc("schedule_save_preferences", { p_actor_id: Number(userId), p_employee_profile_id: Number(row.dataset.preferenceProfile), p_work_type: row.querySelector("[data-work-type]").value, p_regular_days_off: days });
+    }
+    scheduleSetStatus("Настройки расписания сохранены.", true);
+    await scheduleLoad(scheduleState.weekStart, false);
+  } catch (error) { scheduleSetStatus(error.message); }
+}
+
 function scheduleValuesFrom(root, selector) {
-  return Object.fromEntries(SCHEDULE_DAYS.map(([key]) => [key, root.querySelector(`${selector}[data-schedule-day="${key}"], ${selector}[data-final-day="${key}"]`)?.value.trim() || ""]));
+  return Object.fromEntries(SCHEDULE_DAYS.map(([key]) => [key, root.querySelector(`[data-schedule-day="${key}"], ${selector}[data-final-day="${key}"]`)?.value.trim() || ""]));
 }
 
 async function scheduleSaveEmployee() {
