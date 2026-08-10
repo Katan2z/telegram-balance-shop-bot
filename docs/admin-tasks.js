@@ -33,6 +33,8 @@ function taskIsOverdue(task) {
 let taskState = {
   users: {},
   adminIds: new Set(),
+  managerIds: new Set(),
+  instructorIds: new Set(),
   tasks: [],
 };
 
@@ -63,6 +65,13 @@ function tasksBuildSection() {
             <textarea id="taskDescription"></textarea>
             <div class="tasks-form-grid">
               <div>
+                <label>Для кого задача</label>
+                <select id="taskAudience">
+                  <option value="managers">Менеджеры</option>
+                  <option value="instructors">Инструкторы</option>
+                </select>
+              </div>
+              <div>
                 <label>Ответственный</label>
                 <select id="taskAssignee"></select>
               </div>
@@ -92,9 +101,10 @@ function tasksBuildSection() {
 }
 
 async function tasksLoadUsersAndAdmins() {
-  const [usersRows, managerRows] = await Promise.all([
+  const [usersRows, managerRows, instructorRows] = await Promise.all([
     supabaseFetch("users?select=telegram_id,username,first_name,last_name,balance&order=first_name.asc"),
     supabaseFetch("managers?select=telegram_id"),
+    supabaseFetch("instructors?select=telegram_id"),
   ]);
 
   const users = {};
@@ -105,8 +115,11 @@ async function tasksLoadUsersAndAdmins() {
 
   const rootIds = typeof ROOT_ADMIN_IDS !== "undefined" ? ROOT_ADMIN_IDS.map(String) : [];
   const managerIds = (managerRows || []).map(row => String(row.telegram_id));
+  const instructorIds = (instructorRows || []).map(row => String(row.telegram_id));
   taskState.users = users;
   taskState.adminIds = new Set([...rootIds, ...managerIds]);
+  taskState.managerIds = new Set([...rootIds, ...managerIds]);
+  taskState.instructorIds = new Set(instructorIds);
 }
 
 function tasksIsAllowed() {
@@ -117,13 +130,15 @@ function tasksRenderAssignees() {
   const select = document.getElementById("taskAssignee");
   if (!select) return;
   const previous = select.value;
-  const options = [...taskState.adminIds]
+  const audience = document.getElementById("taskAudience")?.value || "managers";
+  const ids = audience === "instructors" ? taskState.instructorIds : taskState.managerIds;
+  const options = [...ids]
     .filter(id => taskState.users[id])
     .map(id => `<option value="${taskEscape(id)}">${taskEscape(taskUserName(taskState.users, id))}</option>`)
     .join("");
   select.innerHTML = options || `<option value="">Нет админов</option>`;
   if (previous && [...select.options].some(option => option.value === previous)) select.value = previous;
-  else if (userId && [...select.options].some(option => option.value === String(userId))) select.value = String(userId);
+  else if (audience === "managers" && userId && [...select.options].some(option => option.value === String(userId))) select.value = String(userId);
 }
 
 async function tasksLoad() {
@@ -161,6 +176,7 @@ function taskCard(task) {
   const completed = Boolean(task.completed);
   const creator = task.created_by ? taskUserName(taskState.users, task.created_by) : "Неизвестно";
   const assignee = task.assigned_to ? taskUserName(taskState.users, task.assigned_to) : "Не назначен";
+  const audience = taskState.instructorIds.has(String(task.assigned_to)) ? "Инструкторы" : "Менеджеры";
   const completedBy = task.completed_by ? taskUserName(taskState.users, task.completed_by) : "";
   const completedAt = task.completed_at ? taskFormatDate(task.completed_at) : "";
 
@@ -181,6 +197,7 @@ function taskCard(task) {
       </div>
       ${task.description ? `<p>${taskEscape(task.description)}</p>` : ""}
       <div class="task-meta-grid">
+        <div><span>Для кого</span><strong>${taskEscape(audience)}</strong></div>
         <div><span>Ответственный</span><strong>${taskEscape(assignee)}</strong></div>
         <div><span>Срок</span><strong>${taskEscape(taskFormatDate(task.due_at))}</strong></div>
         <div><span>Создал</span><strong>${taskEscape(creator)}</strong></div>
@@ -292,8 +309,10 @@ function tasksInit() {
     if (dueInput && !dueInput.value) dueInput.value = taskDateInputValue(new Date(Date.now() + 24 * 60 * 60 * 1000));
     const createBtn = document.getElementById("taskCreate");
     const refreshBtn = document.getElementById("tasksRefresh");
+    const audienceSelect = document.getElementById("taskAudience");
     if (createBtn) createBtn.onclick = tasksCreate;
     if (refreshBtn) refreshBtn.onclick = () => tasksLoad().catch(() => {});
+    if (audienceSelect) audienceSelect.onchange = tasksRenderAssignees;
     setInterval(() => tasksLoad().catch(() => {}), 10000);
   }).catch(() => {});
 }

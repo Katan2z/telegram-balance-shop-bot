@@ -27,9 +27,20 @@ ROOT_ADMINS = {818748106, 747818163, 5311640125}
 ADMIN_STATES = {}
 TASK_NOTIFY_CHAT_TITLE = os.getenv("TASK_NOTIFY_CHAT_TITLE", "Администрация нбучей бутербродной")
 TASK_NOTIFY_SETTING_KEY = "task_notify_chat_id"
+TASK_NOTIFY_THREAD_SETTING_KEY = "task_notify_thread_id"
+INSTRUCTOR_NOTIFY_CHAT_SETTING_KEY = "instructor_notify_chat_id"
+INSTRUCTOR_NOTIFY_THREAD_SETTING_KEY = "instructor_notify_thread_id"
+MANAGER_TASK_NOTIFY_ENABLED_KEY = "manager_task_notify_enabled"
+INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY = "instructor_task_notify_enabled"
+SCHEDULE_NOTIFY_ENABLED_KEY = "schedule_notify_enabled"
 SCHEDULE_NOTIFY_SETTING_KEY = "schedule_notify_chat_id"
 SCHEDULE_NOTIFY_THREAD_SETTING_KEY = "schedule_notify_thread_id"
 SCHEDULE_NOTIFY_LAST_SENT_KEY = "schedule_notify_last_sent_at"
+NOTIFICATION_TOGGLE_KEYS = {
+    "managers": MANAGER_TASK_NOTIFY_ENABLED_KEY,
+    "instructors": INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY,
+    "schedule": SCHEDULE_NOTIFY_ENABLED_KEY,
+}
 MOSCOW_OFFSET = timedelta(hours=3)
 router = Router()
 
@@ -169,6 +180,7 @@ def admin_keyboard():
         [InlineKeyboardButton(text="➖ Списать спасибки", callback_data="admin_remove_balance")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="🧾 Последние операции", callback_data="admin_transactions")],
+        [InlineKeyboardButton(text="🔔 Настройки уведомлений", callback_data="notify_settings")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")],
     ])
 
@@ -205,6 +217,64 @@ def task_notify_text(task: dict) -> str:
         lines.extend(["", description])
     lines.extend(["", f"👤 Ответственный: <b>{assignee}</b>", f"🕒 Срок: <b>{due}</b>", f"✍️ Создал: <b>{creator}</b>", "", "Открой Mini App → Задачи"])
     return "\n".join(lines)
+
+
+def notification_enabled(key: str) -> bool:
+    return db.get_setting(key) != "0"
+
+
+def notification_destination(chat_key: str, thread_key: str) -> tuple[int, int | None] | None:
+    chat = db.get_setting(chat_key)
+    if not chat or not chat.lstrip("-").isdigit():
+        return None
+    thread = db.get_setting(thread_key)
+    thread_id = int(thread) if thread and thread.isdigit() and int(thread) > 0 else None
+    return int(chat), thread_id
+
+
+def save_notification_destination(message: Message, chat_key: str, thread_key: str, enabled_key: str) -> None:
+    db.save_chat(message.chat)
+    db.set_setting(chat_key, str(message.chat.id))
+    db.set_setting(thread_key, str(message.message_thread_id or 0))
+    db.set_setting(enabled_key, "1")
+
+
+def notification_status_line(title: str, enabled_key: str, destination: tuple[int, int | None] | None) -> str:
+    enabled = "включены" if notification_enabled(enabled_key) else "выключены"
+    configured = "чат настроен" if destination else "чат не настроен"
+    return f"{title}: {enabled} · {configured}"
+
+
+def notification_settings_text() -> str:
+    manager_chat = notification_destination(TASK_NOTIFY_SETTING_KEY, TASK_NOTIFY_THREAD_SETTING_KEY)
+    instructor_chat = notification_destination(INSTRUCTOR_NOTIFY_CHAT_SETTING_KEY, INSTRUCTOR_NOTIFY_THREAD_SETTING_KEY)
+    schedule_chat = notification_destination(SCHEDULE_NOTIFY_SETTING_KEY, SCHEDULE_NOTIFY_THREAD_SETTING_KEY)
+    return "\n".join([
+        "🔔 <b>Настройки уведомлений</b>",
+        "",
+        notification_status_line("Задачи менеджеров", MANAGER_TASK_NOTIFY_ENABLED_KEY, manager_chat),
+        notification_status_line("Задачи инструкторов", INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY, instructor_chat),
+        notification_status_line("Напоминания расписания", SCHEDULE_NOTIFY_ENABLED_KEY, schedule_chat),
+        "",
+        "Команды нужно отправить в нужной группе или теме:",
+        "/uved — задачи менеджеров",
+        "/uved_instr — задачи инструкторов",
+        "/uved_chbr — расписание сотрудников",
+    ])
+
+
+def notification_settings_keyboard() -> InlineKeyboardMarkup:
+    def toggle(text: str, key: str, callback: str) -> InlineKeyboardButton:
+        marker = "✅" if notification_enabled(key) else "❌"
+        return InlineKeyboardButton(text=f"{marker} {text}", callback_data=f"notify_toggle:{callback}")
+
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [toggle("Задачи менеджеров", MANAGER_TASK_NOTIFY_ENABLED_KEY, "managers")],
+        [toggle("Задачи инструкторов", INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY, "instructors")],
+        [toggle("Напоминания расписания", SCHEDULE_NOTIFY_ENABLED_KEY, "schedule")],
+        [InlineKeyboardButton(text="🔄 Обновить", callback_data="notify_settings")],
+        [InlineKeyboardButton(text="⬅️ В админку", callback_data="admin")],
+    ])
 
 
 def users_text(limit=25):
@@ -258,6 +328,18 @@ def get_task_notify_chat_id():
     if chat:
         return int(chat["chat_id"])
     return None
+
+
+def manager_task_destination() -> tuple[int, int | None] | None:
+    destination = notification_destination(TASK_NOTIFY_SETTING_KEY, TASK_NOTIFY_THREAD_SETTING_KEY)
+    if destination:
+        return destination
+    fallback = get_task_notify_chat_id()
+    return (fallback, None) if fallback else None
+
+
+def instructor_task_destination() -> tuple[int, int | None] | None:
+    return notification_destination(INSTRUCTOR_NOTIFY_CHAT_SETTING_KEY, INSTRUCTOR_NOTIFY_THREAD_SETTING_KEY)
 
 
 def schedule_target_week(local_now: datetime | None = None) -> str:
@@ -316,6 +398,8 @@ async def send_schedule_reminder(
     record_send: bool = True,
     message_thread_id: int | None = None,
 ) -> bool:
+    if not force and not notification_enabled(SCHEDULE_NOTIFY_ENABLED_KEY):
+        return False
     use_saved_destination = chat_id is None
     saved_chat = db.get_setting(SCHEDULE_NOTIFY_SETTING_KEY) if use_saved_destination else str(chat_id)
     if not saved_chat or not saved_chat.lstrip("-").isdigit():
@@ -356,14 +440,22 @@ async def notify_new_tasks_loop(bot: Bot):
     await asyncio.sleep(5)
     while True:
         try:
-            chat_id = get_task_notify_chat_id()
-            if not chat_id:
-                print("Task notify chat is not configured. Use /uved in target chat.")
-                await asyncio.sleep(60)
-                continue
-            for task in db.list_unnotified_admin_tasks(limit=10):
+            instructor_ids = db.instructor_ids()
+            for task in db.list_unnotified_admin_tasks(limit=100):
                 try:
-                    await bot.send_message(chat_id, task_notify_text(task), parse_mode="HTML")
+                    is_instructor_task = int(task.get("assigned_to") or 0) in instructor_ids
+                    if is_instructor_task:
+                        if not notification_enabled(INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY):
+                            continue
+                        destination = instructor_task_destination()
+                    else:
+                        if not notification_enabled(MANAGER_TASK_NOTIFY_ENABLED_KEY):
+                            continue
+                        destination = manager_task_destination()
+                    if not destination:
+                        continue
+                    chat_id, thread_id = destination
+                    await send_topic_html(bot, chat_id, task_notify_text(task), thread_id)
                     db.mark_admin_task_notified(int(task["id"]))
                 except Exception as error:
                     print(f"Task notification send error: {error}")
@@ -381,9 +473,10 @@ async def monthly_reset_loop(bot: Bot):
             month_key = previous_month_key_for(local)
             if should_run_monthly_reset(local) and not db.monthly_conversion_exists(month_key):
                 result = db.run_monthly_coin_conversion(month_key)
-                chat_id = get_task_notify_chat_id()
-                if chat_id:
-                    await bot.send_message(chat_id, conversion_text(result))
+                destination = manager_task_destination()
+                if destination and notification_enabled(MANAGER_TASK_NOTIFY_ENABLED_KEY):
+                    chat_id, thread_id = destination
+                    await send_topic_html(bot, chat_id, conversion_text(result), thread_id)
             await asyncio.sleep(60)
         except Exception as error:
             print(f"Monthly reset loop error: {error}")
@@ -446,6 +539,22 @@ async def app_handler(message: Message):
     await answer(message, "Открой личный чат с ботом и нажми кнопку меню «Спасибки».", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Открыть бота", url=bot_url())]]))
 
 
+@router.message(Command("settings"))
+async def settings_command(message: Message):
+    if not message.from_user or message.from_user.id not in root_admin_ids():
+        await answer(message, "⛔ Настройки уведомлений доступны только главному администратору.")
+        return
+    if message.chat.type != "private":
+        await answer(message, "Открой личный чат с ботом и отправь /settings")
+        return
+    await answer(
+        message,
+        notification_settings_text(),
+        parse_mode="HTML",
+        reply_markup=notification_settings_keyboard(),
+    )
+
+
 @router.message(Command("uved"))
 async def uved_command(message: Message):
     if message.chat.type == "private":
@@ -455,9 +564,30 @@ async def uved_command(message: Message):
         await answer(message, "⛔ Команда доступна только админам и менеджерам.")
         return
     if db.enabled():
-        db.save_chat(message.chat)
-        db.set_setting(TASK_NOTIFY_SETTING_KEY, str(message.chat.id))
+        save_notification_destination(
+            message,
+            TASK_NOTIFY_SETTING_KEY,
+            TASK_NOTIFY_THREAD_SETTING_KEY,
+            MANAGER_TASK_NOTIFY_ENABLED_KEY,
+        )
     await answer(message, f"✅ Уведомления о новых задачах будут приходить в эту беседу.\nЧат: {message.chat.title or message.chat.id}")
+
+
+@router.message(Command("uved_instr"))
+async def uved_instr_command(message: Message):
+    if message.chat.type == "private":
+        await answer(message, "Эту команду нужно отправить в группе или теме инструкторов.")
+        return
+    if not message.from_user or message.from_user.id not in root_admin_ids():
+        await answer(message, "⛔ Команда доступна только главному администратору.")
+        return
+    save_notification_destination(
+        message,
+        INSTRUCTOR_NOTIFY_CHAT_SETTING_KEY,
+        INSTRUCTOR_NOTIFY_THREAD_SETTING_KEY,
+        INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY,
+    )
+    await answer(message, "✅ Новые задачи инструкторов будут приходить в эту группу и тему.")
 
 
 @router.message(Command("uved_chbr"))
@@ -468,9 +598,12 @@ async def uved_chbr_command(message: Message, bot: Bot):
     if not message.from_user or message.from_user.id not in root_admin_ids():
         await answer(message, "⛔ Команда доступна только главному администратору.")
         return
-    db.save_chat(message.chat)
-    db.set_setting(SCHEDULE_NOTIFY_SETTING_KEY, str(message.chat.id))
-    db.set_setting(SCHEDULE_NOTIFY_THREAD_SETTING_KEY, str(message.message_thread_id or 0))
+    save_notification_destination(
+        message,
+        SCHEDULE_NOTIFY_SETTING_KEY,
+        SCHEDULE_NOTIFY_THREAD_SETTING_KEY,
+        SCHEDULE_NOTIFY_ENABLED_KEY,
+    )
     await answer(
         message,
         "✅ Напоминания о расписании включены в этой группе.\n"
@@ -646,6 +779,38 @@ async def admin_callback(callback: CallbackQuery):
         return
     await callback.message.edit_text("👑 Админка", reply_markup=admin_keyboard())
     await callback.answer()
+
+
+@router.callback_query(F.data == "notify_settings")
+async def notification_settings_callback(callback: CallbackQuery):
+    if callback.from_user.id not in root_admin_ids():
+        await callback.answer("⛔ Только для главного администратора.", show_alert=True)
+        return
+    await callback.message.edit_text(
+        notification_settings_text(),
+        parse_mode="HTML",
+        reply_markup=notification_settings_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("notify_toggle:"))
+async def notification_toggle_callback(callback: CallbackQuery):
+    if callback.from_user.id not in root_admin_ids():
+        await callback.answer("⛔ Только для главного администратора.", show_alert=True)
+        return
+    setting_name = (callback.data or "").split(":", 1)[-1]
+    key = NOTIFICATION_TOGGLE_KEYS.get(setting_name)
+    if not key:
+        await callback.answer("Неизвестная настройка.", show_alert=True)
+        return
+    db.set_setting(key, "0" if notification_enabled(key) else "1")
+    await callback.message.edit_text(
+        notification_settings_text(),
+        parse_mode="HTML",
+        reply_markup=notification_settings_keyboard(),
+    )
+    await callback.answer("Настройка сохранена")
 
 
 @router.callback_query(F.data == "admin_users")

@@ -34,7 +34,7 @@
   font-weight: 800;
 }
 .tasks-form textarea { min-height: 90px; resize: vertical; }
-.tasks-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tasks-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .tasks-columns { display: grid; grid-template-columns: 1.15fr .85fr; gap: 14px; }
 .tasks-columns section {
   padding: 14px;
