@@ -72,6 +72,35 @@ class ScheduleTests(unittest.TestCase):
         self.assertIn("availability jsonb", migration)
         self.assertIn("final_schedule jsonb", migration)
 
+    def test_permanent_preferences_and_configurable_day_off_limit(self):
+        migration = (ROOT / "docs" / "migrations" / "20260810_schedule_preferences.sql").read_text(encoding="utf-8")
+        self.assertIn("create table if not exists public.schedule_preferences", migration)
+        self.assertIn("work_type in ('PT1', 'PT2', 'FT')", migration)
+        self.assertIn("regular_days_off jsonb", migration)
+        self.assertIn("max_regular_days_off smallint not null default 4", migration)
+        self.assertIn("schedule_save_preferences", migration)
+        self.assertIn("schedule_save_settings", migration)
+
+    def test_day_off_limit_is_checked_atomically_and_regular_days_are_exempt(self):
+        migration = (ROOT / "docs" / "migrations" / "20260810_schedule_preferences.sql").read_text(encoding="utf-8")
+        self.assertIn("pg_advisory_xact_lock", migration)
+        self.assertIn("v_used >= v_limit", migration)
+        self.assertIn("not coalesce((v_regular_days_off ->> v_day)::boolean, false)", migration)
+        self.assertIn("sp.regular_days_off ->> v_day", migration)
+
+    def test_employee_schedule_uses_quick_day_and_time_controls(self):
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        self.assertIn('data-day-mode="work"', source)
+        self.assertIn('data-day-mode="off"', source)
+        self.assertIn('type="time" data-time-from', source)
+        self.assertIn('type="time" data-time-to', source)
+        self.assertIn("day_off_counts", source)
+
+    def test_schedule_managers_can_edit_preferences(self):
+        migration = (ROOT / "docs" / "migrations" / "20260810_schedule_preferences.sql").read_text(encoding="utf-8")
+        self.assertGreaterEqual(migration.count("public.schedule_is_admin(p_actor_id)"), 2)
+        self.assertIn("Only schedule managers can edit preferences", migration)
+
 
 if __name__ == "__main__":
     unittest.main()
