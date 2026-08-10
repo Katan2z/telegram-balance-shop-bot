@@ -2,6 +2,7 @@ const SCHEDULE_DAYS = [
   ["mon", "Понедельник"], ["tue", "Вторник"], ["wed", "Среда"],
   ["thu", "Четверг"], ["fri", "Пятница"], ["sat", "Суббота"], ["sun", "Воскресенье"],
 ];
+const SCHEDULE_DAY_SHORT = { mon: "ПН", tue: "ВТ", wed: "СР", thu: "ЧТ", fri: "ПТ", sat: "СБ", sun: "ВС" };
 const scheduleState = { weekStart: "", payload: null, weeks: [], settingsOpen: false };
 
 function scheduleConfig() {
@@ -190,7 +191,7 @@ function scheduleSettingsMarkup(entries) {
     <div class="schedule-settings-list">${entries.map(entry => `<div class="schedule-preference-row" data-preference-profile="${entry.employee_profile_id}">
       <strong>${scheduleEscape(entry.employee_name)}</strong>
       <select data-work-type><option ${entry.work_type === "PT1" ? "selected" : ""}>PT1</option><option ${entry.work_type === "PT2" ? "selected" : ""}>PT2</option><option ${!entry.work_type || entry.work_type === "FT" ? "selected" : ""}>FT</option></select>
-      <div class="schedule-regular-days">${SCHEDULE_DAYS.map(([key, label]) => `<label><input type="checkbox" data-regular-off="${key}" ${entry.regular_days_off?.[key] ? "checked" : ""}>${label.slice(0, 2)}</label>`).join("")}</div>
+      <div class="schedule-regular-days">${SCHEDULE_DAYS.map(([key]) => `<label><input type="checkbox" data-regular-off="${key}" ${entry.regular_days_off?.[key] ? "checked" : ""}>${SCHEDULE_DAY_SHORT[key]}</label>`).join("")}</div>
     </div>`).join("")}</div>
     <button type="button" class="schedule-primary" id="scheduleSaveSettings">Сохранить настройки</button>
   </section>`;
