@@ -161,6 +161,7 @@ function scheduleEmployeeDayMarkup(entry, key, label, index, disabled) {
     <strong>${label}</strong><small>${scheduleDateText(scheduleAddDays(scheduleState.weekStart, index), true)}</small>
     <div class="schedule-day-actions">
       <button type="button" data-day-mode="work" ${disabled}>Работаю</button>
+      <button type="button" data-day-mode="ft" ${disabled}>ФТ</button>
       <button type="button" data-day-mode="off" ${disabled || dayOffBlocked ? "disabled" : ""}>Выходной</button>
       <button type="button" data-day-mode="clear" ${disabled}>Очистить</button>
     </div>
@@ -238,6 +239,7 @@ function scheduleBindEmployeeDay(card) {
     choice.textContent = value.value || "Выберите начало и конец";
   });
   card.querySelector('[data-day-mode="off"]')?.addEventListener("click", () => { times.hidden = true; value.value = "Выходной"; choice.textContent = "Выходной"; });
+  card.querySelector('[data-day-mode="ft"]')?.addEventListener("click", () => { times.hidden = true; value.value = "ФТ"; choice.textContent = "ФТ"; });
   card.querySelector('[data-day-mode="clear"]')?.addEventListener("click", () => { times.hidden = true; value.value = ""; choice.textContent = "Не выбрано"; card.querySelectorAll("input[type=time]").forEach(input => input.value = ""); });
 }
 

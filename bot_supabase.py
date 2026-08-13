@@ -400,6 +400,8 @@ async def send_schedule_reminder(
 ) -> bool:
     if not force and not notification_enabled(SCHEDULE_NOTIFY_ENABLED_KEY):
         return False
+    if not force and not reminders.reminder_window_open(moscow_now()):
+        return False
     use_saved_destination = chat_id is None
     saved_chat = db.get_setting(SCHEDULE_NOTIFY_SETTING_KEY) if use_saved_destination else str(chat_id)
     if not saved_chat or not saved_chat.lstrip("-").isdigit():
@@ -655,6 +657,10 @@ async def announce_all_command(message: Message, bot: Bot):
         "employee_profiles?activation_status=eq.active&telegram_id=not.is.null"
         "&select=full_name,telegram_id&order=full_name.asc",
     ) or []
+    user_rows = db.request("GET", "users?select=telegram_id,username") or []
+    usernames = {int(row["telegram_id"]): row.get("username") for row in user_rows if row.get("telegram_id") is not None}
+    for employee in employees:
+        employee["username"] = usernames.get(int(employee["telegram_id"]))
     for text in reminders.announcement_messages(parts[1], employees):
         await send_topic_html(
             bot,

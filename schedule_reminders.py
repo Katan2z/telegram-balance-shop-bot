@@ -5,6 +5,11 @@ from html import escape
 REMINDER_INTERVAL = timedelta(hours=4)
 
 
+def reminder_window_open(local_now: datetime) -> bool:
+    """Remind from Sunday through the Wednesday collection deadline."""
+    return local_now.weekday() in {6, 0, 1, 2}
+
+
 def target_week(local_now: datetime) -> str:
     days_until_next_monday = 7 - local_now.weekday()
     if local_now.weekday() > 2:
@@ -51,11 +56,18 @@ def reminder_text(week_start: str, employees: list[dict]) -> str:
 
 def announcement_messages(text: str, employees: list[dict], limit: int = 4000) -> list[str]:
     heading = f"📣 <b>{escape(text.strip())}</b>"
-    mentions = [
-        f'<a href="tg://user?id={int(employee["telegram_id"])}">{escape(str(employee.get("full_name") or "Сотрудник"))}</a>'
-        for employee in employees
-        if employee.get("telegram_id") is not None
-    ]
+    mentions = []
+    for employee in employees:
+        if employee.get("telegram_id") is None:
+            continue
+        username = str(employee.get("username") or "").strip().lstrip("@")
+        if username:
+            mentions.append(f"@{escape(username)}")
+        else:
+            mentions.append(
+                f'<a href="tg://user?id={int(employee["telegram_id"])}">'
+                f'{escape(str(employee.get("full_name") or "Сотрудник"))}</a>'
+            )
     if not mentions:
         return [heading]
     messages = []

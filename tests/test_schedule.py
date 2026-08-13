@@ -107,6 +107,11 @@ class ScheduleTests(unittest.TestCase):
             self.assertIn(abbreviation, source)
         self.assertIn("SCHEDULE_DAY_SHORT[key]", source)
 
+    def test_employee_has_full_time_quick_button(self):
+        source = (ROOT / "docs" / "schedule.js").read_text(encoding="utf-8")
+        self.assertIn('data-day-mode="ft"', source)
+        self.assertIn('value.value = "ФТ"', source)
+
 
 if __name__ == "__main__":
     unittest.main()
