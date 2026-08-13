@@ -26,6 +26,13 @@ class FeedbackTests(unittest.TestCase):
         self.assertIn("window.BK8Permissions?.isAdmin()", source)
         self.assertIn("item.employee_name", source)
 
+    def test_feedback_is_reachable_from_home_quick_actions(self):
+        navigation = (ROOT / "docs" / "navigation.js").read_text(encoding="utf-8")
+        index = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('{ tab: "feedback"', navigation)
+        self.assertIn('title: "Жалобы и предложения"', navigation)
+        self.assertIn('navigation.js?v=20260814-feedback2', index)
+
 
 if __name__ == "__main__":
     unittest.main()
