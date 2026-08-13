@@ -95,6 +95,7 @@ const navStart = () => {
 };
 
 document.addEventListener("DOMContentLoaded", navStart);
+window.addEventListener("bk8:feedback-ready", setupSimpleNavigation);
 setTimeout(navStart, 300);
 setTimeout(setupSimpleNavigation, 1200);
 setInterval(setupSimpleNavigation, 2500);

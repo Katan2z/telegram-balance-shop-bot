@@ -23,7 +23,7 @@ class FeedbackTests(unittest.TestCase):
         source = (ROOT / "docs" / "feedback.js").read_text(encoding="utf-8")
         self.assertIn('feedbackRpc("feedback_submit"', source)
         self.assertIn('feedbackRpc("feedback_list"', source)
-        self.assertIn("window.BK8Permissions?.isAdmin()", source)
+        self.assertIn('permissions?.can?.("manageEmployees")', source)
         self.assertIn("item.employee_name", source)
 
     def test_feedback_is_reachable_from_home_quick_actions(self):
@@ -31,7 +31,14 @@ class FeedbackTests(unittest.TestCase):
         index = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn('{ tab: "feedback"', navigation)
         self.assertIn('title: "Жалобы и предложения"', navigation)
-        self.assertIn('navigation.js?v=20260814-feedback2', index)
+        self.assertIn('navigation.js?v=20260814-feedback3', index)
+
+    def test_feedback_navigation_refreshes_for_every_role(self):
+        source = (ROOT / "docs" / "feedback.js").read_text(encoding="utf-8")
+        navigation = (ROOT / "docs" / "navigation.js").read_text(encoding="utf-8")
+        self.assertIn('CustomEvent("bk8:feedback-ready")', source)
+        self.assertIn('addEventListener("bk8:feedback-ready", setupSimpleNavigation)', navigation)
+        self.assertNotIn('if (!feedbackCanManage()) return;\n  feedbackBuildSection()', source)
 
 
 if __name__ == "__main__":
