@@ -46,6 +46,12 @@ function feedbackBuildSection() {
     </section>`);
   document.getElementById("feedbackForm").onsubmit = feedbackSubmit;
   document.getElementById("feedbackRefresh").onclick = feedbackLoadManagerList;
+  window.dispatchEvent(new CustomEvent("bk8:feedback-ready"));
+}
+
+function feedbackCanManage() {
+  const permissions = window.BK8Permissions;
+  return Boolean(permissions?.can?.("manageEmployees") || permissions?.isAdmin?.());
 }
 
 function feedbackSetStatus(text, ok = false) {
@@ -64,7 +70,7 @@ async function feedbackSubmit(event) {
     await feedbackRpc("feedback_submit", { p_actor_id: Number(window.userId), p_kind: document.getElementById("feedbackKind").value, p_message: message });
     event.target.reset();
     feedbackSetStatus("Спасибо! Менеджеры увидят ваше обращение.", true);
-    if (window.BK8Permissions?.isAdmin()) await feedbackLoadManagerList();
+    if (feedbackCanManage()) await feedbackLoadManagerList();
   } catch (error) { feedbackSetStatus(error.message); }
 }
 
@@ -81,7 +87,7 @@ function feedbackRenderManagerList() {
 }
 
 async function feedbackLoadManagerList() {
-  if (!window.BK8Permissions?.isAdmin()) return;
+  if (!feedbackCanManage()) return;
   try {
     feedbackState.items = await feedbackRpc("feedback_list", { p_actor_id: Number(window.userId) }) || [];
     feedbackRenderManagerList();
@@ -92,7 +98,7 @@ async function feedbackStart() {
   feedbackBuildSection();
   const permissions = window.BK8Permissions;
   if (!permissions?.state?.loaded) await permissions?.load?.();
-  if (permissions?.isAdmin()) {
+  if (feedbackCanManage()) {
     document.getElementById("feedbackManagerView").hidden = false;
     await feedbackLoadManagerList();
   }
