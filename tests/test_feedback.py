@@ -1,0 +1,31 @@
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class FeedbackTests(unittest.TestCase):
+    def test_feedback_storage_is_private_and_manager_read_is_guarded(self):
+        migration = (ROOT / "docs" / "migrations" / "20260813_bot_feedback.sql").read_text(encoding="utf-8")
+        self.assertIn("alter table public.bot_feedback enable row level security", migration)
+        self.assertIn("revoke all on public.bot_feedback from anon, authenticated", migration)
+        self.assertIn("public.schedule_is_admin(p_actor_id)", migration)
+        self.assertIn("Only managers can read feedback", migration)
+
+    def test_only_active_employees_can_submit_and_name_is_recorded(self):
+        migration = (ROOT / "docs" / "migrations" / "20260813_bot_feedback.sql").read_text(encoding="utf-8")
+        self.assertIn("activation_status = 'active'", migration)
+        self.assertIn("employee_name", migration)
+        self.assertIn("v_employee.full_name", migration)
+
+    def test_feedback_ui_submits_and_only_admin_loads_list(self):
+        source = (ROOT / "docs" / "feedback.js").read_text(encoding="utf-8")
+        self.assertIn('feedbackRpc("feedback_submit"', source)
+        self.assertIn('feedbackRpc("feedback_list"', source)
+        self.assertIn("window.BK8Permissions?.isAdmin()", source)
+        self.assertIn("item.employee_name", source)
+
+
+if __name__ == "__main__":
+    unittest.main()
