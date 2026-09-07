@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "17 */4 * * *"
   workflow_dispatch:
+    inputs:
+      reset_spasibki:
+        description: "Reset only current spasibki balances"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: telegram-bot-watchdog
@@ -27,11 +33,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Catch up monthly balance reset
+        if: ${{ !inputs.reset_spasibki }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: python monthly_maintenance.py
+      - name: Reset only spasibki balances
+        if: ${{ inputs.reset_spasibki }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python -c "import supabase_storage as db; print(db.reset_spasibki_balances())"
       - name: Restart complete bot
         if: ${{ always() }}
         env:

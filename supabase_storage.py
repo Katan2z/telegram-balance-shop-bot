@@ -245,6 +245,23 @@ def monthly_conversion_exists(month_key: str) -> bool:
     return bool(rows)
 
 
+def reset_spasibki_balances() -> dict:
+    """Manually zero only spasibki and their conversion checkpoints."""
+    users = request("GET", "users?select=telegram_id,balance") or []
+    affected_users = sum(1 for user in users if int(user.get("balance", 0) or 0) != 0)
+    total_spasibki = sum(max(int(user.get("balance", 0) or 0), 0) for user in users)
+    request(
+        "PATCH",
+        "users?balance=neq.0",
+        headers=headers("return=minimal"),
+        json={"balance": 0, "coin_checkpoint": 0, "updated_at": now()},
+    )
+    remaining = request("GET", "users?balance=neq.0&select=telegram_id&limit=1") or []
+    if remaining:
+        raise RuntimeError("Spasibki reset verification failed")
+    return {"ok": True, "affected_users": affected_users, "total_spasibki": total_spasibki}
+
+
 def run_monthly_coin_conversion(month_key: str) -> dict:
     if monthly_conversion_exists(month_key):
         return {"ok": False, "already_done": True, "month_key": month_key}

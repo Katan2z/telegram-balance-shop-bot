@@ -51,6 +51,13 @@ class MonthlyMaintenanceTests(unittest.TestCase):
         self.assertIn("gh workflow run bot.yml --ref main", watchdog)
         self.assertNotIn("monthly_reset_loop", runner)
 
+    def test_watchdog_exposes_manual_spasibki_only_reset(self):
+        watchdog_path = ROOT / ".github" / "workflows" / "bot-timesheet.yml"
+        watchdog = watchdog_path.read_text(encoding="utf-8")
+        self.assertIn("reset_spasibki:", watchdog)
+        self.assertIn("type: boolean", watchdog)
+        self.assertIn("db.reset_spasibki_balances()", watchdog)
+
 
 if __name__ == "__main__":
     unittest.main()
