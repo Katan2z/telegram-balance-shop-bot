@@ -446,7 +446,11 @@ async def notify_new_tasks_loop(bot: Bot):
             for task in db.list_unnotified_admin_tasks(limit=100):
                 try:
                     is_instructor_task = int(task.get("assigned_to") or 0) in instructor_ids
-                    if is_instructor_task:
+                    direct_chat_id = task.get("notification_chat_id")
+                    direct_thread_id = task.get("notification_thread_id")
+                    if direct_chat_id:
+                        destination = (int(direct_chat_id), int(direct_thread_id) if direct_thread_id else None)
+                    elif is_instructor_task:
                         if not notification_enabled(INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY):
                             continue
                         destination = instructor_task_destination()

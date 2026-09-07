@@ -231,7 +231,7 @@ def find_chat_by_title(title_part: str) -> dict | None:
 def list_unnotified_admin_tasks(limit: int = 10) -> list[dict]:
     return request(
         "GET",
-        "admin_tasks?select=id,title,description,assigned_to,due_at,created_by,created_at,notified_at"
+        "admin_tasks?select=*"
         f"&notified_at=is.null&order=created_at.asc&limit={limit}",
     ) or []
 

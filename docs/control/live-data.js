@@ -28,6 +28,8 @@
     if (response.status === 204 || options.headers?.Prefer === "return=minimal") return null;
     return response.json();
   }
+  window.bk8Api = api;
+  window.bk8Session = session;
 
   function showLoadError(error) {
     console.error(error);
@@ -95,6 +97,32 @@
     const chat = document.querySelector("#taskChat");
     chat.innerHTML = '<option value="">Выберите чат</option>' + chats.map(row => `<option value="${Number(row.chat_id)}">${esc(row.title)}</option>`).join("");
     document.querySelector("#chatNote").textContent = `Бот видит ${chats.length} чата`;
+    const assignee = document.querySelector("#taskAssignee");
+    assignee.innerHTML = '<option value="">Выберите сотрудника</option>' + profiles.filter(row => row.telegram_id).map(row => `<option value="${Number(row.telegram_id)}">${esc(row.full_name)}</option>`).join("");
+    const due = new Date(); due.setDate(due.getDate() + 1); due.setMinutes(due.getMinutes() - due.getTimezoneOffset());
+    document.querySelector("#taskDue").value = due.toISOString().slice(0, 16);
+    document.querySelector("#taskForm").onsubmit = async event => {
+      event.preventDefault();
+      const button = event.currentTarget.querySelector('[type="submit"]');
+      button.disabled = true; button.textContent = "Создаём…";
+      try {
+        const active = session()?.profile || {};
+        const payload = {
+          title: document.querySelector("#taskTitle").value.trim(),
+          description: document.querySelector("#taskDescription").value.trim(),
+          assigned_to: Number(document.querySelector("#taskAssignee").value),
+          due_at: new Date(document.querySelector("#taskDue").value).toISOString(),
+          priority: document.querySelector("#taskPriority").value,
+          notification_chat_id: Number(document.querySelector("#taskChat").value),
+          created_by: active.admin_role === "super_admin" ? 818748106 : 1217248152,
+          completed: false
+        };
+        await api("admin_tasks", {method:"POST", headers:{Prefer:"return=minimal"}, body:JSON.stringify(payload)});
+        toast("Задача создана — бот отправит её в выбранный чат");
+        originalTasks(); await loadTasks();
+      } catch (error) { toast(error.message.includes("notification_chat_id") ? "Сначала примените миграцию маршрутизации задач" : error.message); }
+      finally { button.disabled = false; button.textContent = "Создать и отправить"; }
+    };
   }
 
   window.enterPanel = function (profile) { originalEnterPanel(profile); loadOverview().catch(showLoadError); };

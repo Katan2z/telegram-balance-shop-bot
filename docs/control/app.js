@@ -27,10 +27,10 @@ function renderTasks(){content.innerHTML=`
       <form id="taskForm">
         <label>Telegram-чат<select id="taskChat" required><option value="">Выберите чат</option><option>Инструкторы · BK8 Центр</option><option>Команда · BK8 Центр</option><option>Менеджеры BK8</option><option>Команда · BK8 Север</option></select></label>
         <div class="chat-note" id="chatNote">Бот состоит в 4 доступных чатах</div>
-        <label>Получатели<select><option>Все участники чата</option><option>Выбрать сотрудников</option><option>Только инструкторы</option><option>Только менеджеры</option></select></label>
+        <label>Ответственный<select id="taskAssignee" required><option value="">Выберите сотрудника</option></select></label>
         <label>Название<input id="taskTitle" placeholder="Что нужно сделать?" required></label>
-        <label>Описание<textarea placeholder="Добавьте подробности задачи"></textarea></label>
-        <div class="form-pair"><label>Срок<input type="date" value="2026-09-09"></label><label>Приоритет<select><option>Обычный</option><option>Важный</option><option>Срочный</option></select></label></div>
+        <label>Описание<textarea id="taskDescription" placeholder="Добавьте подробности задачи"></textarea></label>
+        <div class="form-pair"><label>Срок<input id="taskDue" type="datetime-local" required></label><label>Приоритет<select id="taskPriority"><option value="normal">Обычный</option><option value="important">Важный</option><option value="urgent">Срочный</option></select></label></div>
         <label class="switch-row"><span><strong>Уведомить в Telegram</strong><small>Бот отправит задачу в выбранный чат</small></span><input type="checkbox" checked></label>
         <button class="primary" type="submit">Создать и отправить</button>
       </form>
