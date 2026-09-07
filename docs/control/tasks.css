@@ -30,6 +30,7 @@
 .editor-dialog::backdrop { background: #2c120b99; backdrop-filter: blur(3px); }
 .editor-dialog label { margin: 14px 0 5px; }
 .editor-dialog .primary { margin-bottom: 0; }
+@media(max-width:600px){.app{padding-bottom:76px}.app>aside{display:block;position:fixed;z-index:20;left:8px;right:8px;bottom:8px;top:auto;width:auto;height:62px;padding:6px;border-radius:18px;box-shadow:0 14px 45px #2b100b55}.app>aside .logo,.app>aside .account{display:none}.app>aside nav{display:flex;align-items:center;gap:4px;padding:0;overflow-x:auto;height:100%}.app>aside .nav-item{display:flex;flex:0 0 54px;height:48px;padding:5px 4px;font-size:10px;line-height:1;flex-direction:column;justify-content:center;gap:3px;text-align:center}.app>aside .nav-item span{font-size:17px}.content{padding-bottom:24px}}
 .schedule-toolbar { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 16px; }
 .schedule-toolbar label { margin: 0; }
 .schedule-toolbar input { margin: 6px 0 0; }
