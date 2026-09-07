@@ -16,6 +16,16 @@
 .employee-live-card div:nth-child(2) span { color: var(--muted); font-size: 13px; margin-top: 4px; }
 .empty-live { padding: 42px; text-align: center; color: var(--muted); }
 @media (max-width: 700px) { .employee-live-card { grid-template-columns: 42px 1fr auto; } .employee-live-card > .secondary { display: none; } }
+.live-section { overflow: hidden; }
+.live-section > h3 { margin-top: 26px; }
+.section-summary { padding: 4px 0 20px; color: var(--muted); }
+.section-summary strong { color: var(--ink); }
+.live-table-wrap { width: 100%; overflow: auto; }
+.live-table-wrap td small { display: block; color: var(--muted); margin-top: 4px; }
+.live-table-wrap code { color: var(--brown); background: #f4e9d8; padding: 4px 7px; border-radius: 6px; }
+.score-live { color: var(--green); font-size: 18px; font-weight: 900; }
+.mini-stats { grid-template-columns: repeat(3, 1fr); margin-bottom: 26px; }
+.schedule-preview { white-space: pre-wrap; max-height: 560px; overflow: auto; background: #3a180f; color: #fff3cf; padding: 18px; border-radius: 14px; font-size: 12px; }
 .task-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, .6fr); gap: 18px; align-items: start; }
 .task-list { padding: 0; overflow: hidden; }
 .section-toolbar { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
