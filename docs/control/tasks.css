@@ -1,5 +1,10 @@
 .compact { width: auto; margin: 0; padding: 12px 18px; }
 .login-error { min-height: 20px; color: var(--red); font-size: 13px; font-weight: 700; margin: 12px 0 -10px; }
+.role-banner { margin-bottom: 20px; border-radius: 15px; padding: 14px 18px; display: flex; align-items: center; gap: 13px; }
+.role-banner strong { white-space: nowrap; }
+.role-banner span { font-size: 13px; }
+.role-banner.super { color: #fff4d0; background: linear-gradient(100deg, #4a2014, #7b301e); border: 1px solid #9d543a; }
+.role-banner.restaurant { color: #254f3d; background: #e5f4ec; border: 1px solid #c3e4d4; }
 .task-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, .6fr); gap: 18px; align-items: start; }
 .task-list { padding: 0; overflow: hidden; }
 .section-toolbar { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
