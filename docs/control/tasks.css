@@ -5,6 +5,17 @@
 .role-banner span { font-size: 13px; }
 .role-banner.super { color: #fff4d0; background: linear-gradient(100deg, #4a2014, #7b301e); border: 1px solid #9d543a; }
 .role-banner.restaurant { color: #254f3d; background: #e5f4ec; border: 1px solid #c3e4d4; }
+.employee-tools { display: flex; align-items: center; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.employee-tools input { margin: 0; max-width: 440px; }
+.employee-tools span { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.employee-live-list { display: grid; }
+.employee-live-card { display: grid; grid-template-columns: 42px minmax(180px, 1fr) auto auto; gap: 14px; align-items: center; padding: 15px 2px; border-bottom: 1px solid #eee2d1; }
+.employee-live-card:last-child { border: 0; }
+.employee-live-card .avatar { width: 42px; height: 42px; }
+.employee-live-card strong, .employee-live-card span { display: block; }
+.employee-live-card div:nth-child(2) span { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.empty-live { padding: 42px; text-align: center; color: var(--muted); }
+@media (max-width: 700px) { .employee-live-card { grid-template-columns: 42px 1fr auto; } .employee-live-card > .secondary { display: none; } }
 .task-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, .6fr); gap: 18px; align-items: start; }
 .task-list { padding: 0; overflow: hidden; }
 .section-toolbar { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
