@@ -19,12 +19,25 @@
       const [employees, medical, pvv] = await Promise.all([
         api("employee_profiles?select=id,full_name,position&order=full_name.asc"),
         api("employee_medical_records?select=*"),
-        api("employee_pvv_documents?select=employee_profile_id,file_name,mime_type,updated_at")
+        api("employee_pvv_documents?select=employee_profile_id,storage_path,file_name,mime_type,updated_at")
       ]);
       const med = new Map(medical.map(row => [String(row.employee_profile_id), row]));
       const docs = new Map(pvv.map(row => [String(row.employee_profile_id), row]));
-      root.innerHTML = `<div class="section-summary"><strong>${employees.length}</strong> сотрудников · <strong>${medical.length}</strong> сансправок · <strong>${pvv.length}</strong> бланков ПВВ</div>` + table(["Сотрудник","Санитарная справка","Санминимум","Флюорография","ПВВ"], employees.map(employee => { const m=med.get(String(employee.id))||{}, p=docs.get(String(employee.id)); return `<tr><td><strong>${esc(employee.full_name)}</strong><small>${esc(employee.position||"")}</small></td><td>${date(m.sanitary_certificate_expires_on)}</td><td>${date(m.sanitary_minimum_expires_on)}</td><td>${date(m.fluorography_expires_on)}</td><td>${p?`<span class="status green">${esc(p.file_name||"Загружен")}</span>`:'<span class="status orange">Нет файла</span>'}</td></tr>`; }));
+      root.innerHTML = `<div class="section-summary"><strong>${employees.length}</strong> сотрудников · <strong>${medical.length}</strong> сансправок · <strong>${pvv.length}</strong> бланков ПВВ</div>` + table(["Сотрудник","Санитарная справка","Санминимум","Флюорография","ПВВ",""], employees.map(employee => { const m=med.get(String(employee.id))||{}, p=docs.get(String(employee.id)); return `<tr><td><strong>${esc(employee.full_name)}</strong><small>${esc(employee.position||"")}</small></td><td>${date(m.sanitary_certificate_expires_on)}</td><td>${date(m.sanitary_minimum_expires_on)}</td><td>${date(m.fluorography_expires_on)}</td><td>${p?`<button class="secondary pvv-open" data-profile="${employee.id}">${esc(p.file_name||"Открыть")}</button>`:'<span class="status orange">Нет файла</span>'}</td><td><button class="secondary medical-edit" data-profile="${employee.id}">Изменить</button></td></tr>`; }));
+      root.querySelectorAll(".medical-edit").forEach(button=>button.onclick=()=>editMedical(Number(button.dataset.profile),med.get(String(button.dataset.profile))||{}));
+      root.querySelectorAll(".pvv-open").forEach(button=>button.onclick=()=>openPvv(docs.get(String(button.dataset.profile))));
     } catch (error) { fail(root,error); }
+  }
+
+  function editMedical(profileId,row){
+    let dialog=document.querySelector("#medicalDialog");
+    if(!dialog){document.body.insertAdjacentHTML("beforeend",'<dialog class="editor-dialog" id="medicalDialog"><form id="medicalForm"><div class="compose-head"><div><span class="eyebrow">САНИТАРНАЯ СПРАВКА</span><h2>Сроки документов</h2></div><button type="button" id="medicalClose">×</button></div><input type="hidden" id="medicalProfile"><label>Санитарная справка<input type="date" id="medicalCertificate"></label><label>Санминимум<input type="date" id="medicalMinimum"></label><label>Флюорография<input type="date" id="medicalFluoro"></label><button class="primary" type="submit">Сохранить</button></form></dialog>');dialog=document.querySelector("#medicalDialog");document.querySelector("#medicalClose").onclick=()=>dialog.close();document.querySelector("#medicalForm").onsubmit=async event=>{event.preventDefault();try{await api("employee_medical_records?on_conflict=employee_profile_id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({employee_profile_id:Number(document.querySelector("#medicalProfile").value),sanitary_certificate_expires_on:document.querySelector("#medicalCertificate").value||null,sanitary_minimum_expires_on:document.querySelector("#medicalMinimum").value||null,fluorography_expires_on:document.querySelector("#medicalFluoro").value||null,updated_at:new Date().toISOString()})});dialog.close();toast("Сроки документов сохранены");documents()}catch(error){toast(error.message)}}}
+    document.querySelector("#medicalProfile").value=profileId;document.querySelector("#medicalCertificate").value=row.sanitary_certificate_expires_on||"";document.querySelector("#medicalMinimum").value=row.sanitary_minimum_expires_on||"";document.querySelector("#medicalFluoro").value=row.fluorography_expires_on||"";dialog.showModal();
+  }
+
+  async function openPvv(row){
+    if(!row?.storage_path)return;
+    try{const active=window.bk8Session();const config=window.APP_CONFIG||{};const response=await fetch(`${String(config.SUPABASE_URL).replace(/\/$/,"")}/storage/v1/object/sign/employee-pvv/${row.storage_path.split('/').map(encodeURIComponent).join('/')}`,{method:"POST",headers:{apikey:config.SUPABASE_ANON_KEY,Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({expiresIn:600})});if(!response.ok)throw new Error(await response.text());const data=await response.json();window.open(`${String(config.SUPABASE_URL).replace(/\/$/,"")}/storage/v1${data.signedURL}`,'_blank','noopener');}catch(error){toast(error.message)}
   }
 
   async function klokr() {

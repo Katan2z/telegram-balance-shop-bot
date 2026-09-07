@@ -53,6 +53,21 @@
     if (stats[0]) { stats[0].querySelector("strong").textContent = profiles.length; stats[0].querySelector(".trend").textContent = `${active.length} активны`; }
     if (stats[2]) { stats[2].querySelector("strong").textContent = expiring; stats[2].querySelector(".trend").textContent = "истекают в течение месяца"; }
     if (stats[3]) { stats[3].querySelector("strong").textContent = openTasks; stats[3].querySelector(".trend").textContent = `${purchases.filter(item => item.status === "pending").length} выдачи ожидают`; }
+    const attention = document.querySelector(".grid .panel");
+    if (attention) {
+      const names = new Map(profiles.map(row => [String(row.id), row.full_name]));
+      const alerts = [];
+      medical.forEach(row => {
+        const values = [row.sanitary_certificate_expires_on, row.sanitary_minimum_expires_on, row.fluorography_expires_on].filter(Boolean).map(value => new Date(value)).filter(value => value >= now && value <= soon);
+        if (values.length) alerts.push(["⚕", names.get(String(row.employee_profile_id)) || "Сотрудник", `Документ истекает ${Math.min(...values.map(value => value.getTime())) ? new Date(Math.min(...values.map(value => value.getTime()))).toLocaleDateString("ru-RU") : "скоро"}`, "Документы"]);
+      });
+      tasks.filter(item => !item.completed && item.due_at && new Date(item.due_at) < new Date(Date.now() + 2 * 86400000)).slice(0, 3).forEach(item => alerts.push(["◆", item.title, `Срок: ${new Date(item.due_at).toLocaleString("ru-RU")}`, "Задача"]));
+      const pending = purchases.filter(item => item.status === "pending").length;
+      if (pending) alerts.push(["▣", "Выдача из магазина", `${pending} покупок ожидают подтверждения`, "Магазин"]);
+      attention.innerHTML = `<h3>Требует внимания</h3>${alerts.slice(0, 6).map(item => `<div class="alert"><div class="alert-icon">${item[0]}</div><div><strong>${esc(item[1])}</strong><small>${esc(item[2])}</small></div><span class="badge">${esc(item[3])}</span></div>`).join("") || '<div class="empty-live">Срочных событий нет</div>'}`;
+    }
+    const quickPages = ["employees", "documents", "tasks", "schedule", "notifications"];
+    document.querySelectorAll(".quick button").forEach((button, index) => { if (quickPages[index]) button.onclick = () => window.openPage(quickPages[index]); });
   }
 
   function employeeCard(row) {
