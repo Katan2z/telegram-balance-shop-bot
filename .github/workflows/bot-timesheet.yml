@@ -1,18 +1,21 @@
-name: Run Telegram Bot Timesheet
+name: Keep Telegram Bot Online
 
 on:
+  schedule:
+    - cron: "17 */4 * * *"
   workflow_dispatch:
 
 concurrency:
-  group: telegram-bot
+  group: telegram-bot-watchdog
   cancel-in-progress: true
 
 jobs:
-  run-bot:
+  maintain-and-restart:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 10
     permissions:
-      contents: write
+      actions: write
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,13 +23,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Run bot
+      - name: Catch up monthly balance reset
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          ADMIN_IDS: ${{ secrets.ADMIN_IDS }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: python bot_runner.py
+        run: python monthly_maintenance.py
+      - name: Restart complete bot
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run bot.yml --ref main
