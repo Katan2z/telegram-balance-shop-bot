@@ -1,0 +1,28 @@
+name: Provision Admin Auth
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Create initial admin accounts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPER_ADMIN_USERNAME: ${{ secrets.INITIAL_SUPER_ADMIN_USERNAME }}
+          SUPER_ADMIN_PASSWORD: ${{ secrets.INITIAL_SUPER_ADMIN_PASSWORD }}
+          RESTAURANT_ADMIN_USERNAME: ${{ secrets.INITIAL_RESTAURANT_ADMIN_USERNAME }}
+          RESTAURANT_ADMIN_PASSWORD: ${{ secrets.INITIAL_RESTAURANT_ADMIN_PASSWORD }}
+        run: python provision_admin_auth.py
