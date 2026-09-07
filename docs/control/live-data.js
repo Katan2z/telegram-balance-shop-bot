@@ -186,15 +186,33 @@
     });
   }
 
-  window.enterPanel = function (profile) { originalEnterPanel(profile); loadOverview().catch(showLoadError); };
+  window.enterPanel = function (profile) { originalEnterPanel(profile); nav.querySelectorAll("button").forEach(button => button.onclick = () => window.openPage(button.dataset.page)); loadOverview().catch(showLoadError); };
   window.renderOverview = function () { originalOverview(); loadOverview().catch(showLoadError); };
   window.renderTasks = function () { originalTasks(); loadTasks().catch(showLoadError); };
   window.openPage = function (page) {
+    if (page === "overview") {
+      nav.querySelectorAll("button").forEach(button => button.classList.toggle("active", button.dataset.page === page));
+      document.querySelector("#crumb").textContent = "Обзор";
+      originalOverview(); loadOverview().catch(showLoadError); return;
+    }
+    if (page === "tasks") {
+      nav.querySelectorAll("button").forEach(button => button.classList.toggle("active", button.dataset.page === page));
+      document.querySelector("#crumb").textContent = "Задачи";
+      originalTasks(); loadTasks().catch(showLoadError); return;
+    }
     if (page === "employees") {
       nav.querySelectorAll("button").forEach(button => button.classList.toggle("active", button.dataset.page === page));
       document.querySelector("#crumb").textContent = "Сотрудники";
       return renderEmployees();
     }
     return originalOpenPage(page);
+  };
+  document.querySelector("#loginForm").onsubmit = async event => {
+    event.preventDefault();
+    const error=document.querySelector("#loginError"),button=event.currentTarget.querySelector('[type="submit"]');
+    error.textContent="";button.disabled=true;button.textContent="Входим…";
+    try{window.enterPanel(await signIn(document.querySelector("#username").value,document.querySelector("#password").value));document.querySelector("#password").value=""}
+    catch(err){error.textContent=err.message}
+    finally{button.disabled=false;button.textContent="Войти в панель"}
   };
 })();
