@@ -29,6 +29,11 @@ class AdminCrudTests(unittest.TestCase):
         self.assertIn("async function deleteShopItem", self.sections)
         self.assertIn("p_is_active:false", self.sections)
 
+    def test_orphan_users_have_guarded_cleanup(self):
+        self.assertIn('id="cleanupUsers"', self.sections)
+        self.assertIn("rpc/admin_cleanup_orphan_users", self.sections)
+        self.assertIn("Сохранено с историей", self.sections)
+
 
 if __name__ == "__main__":
     unittest.main()
