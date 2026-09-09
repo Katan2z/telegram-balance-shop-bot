@@ -49,6 +49,7 @@
 .settings-live article { border: 1px solid var(--line); border-radius: 15px; padding: 20px; }
 @media(max-width:900px){.notification-grid,.settings-live{grid-template-columns:1fr}.schedule-toolbar{align-items:stretch;flex-direction:column}}
 .manager-actions { display: flex; align-items: end; gap: 10px; margin-bottom: 20px; }
+.row-actions { display: flex; gap: 7px; flex-wrap: wrap; }
 .manager-actions select { margin: 0; max-width: 420px; }
 .task-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, .6fr); gap: 18px; align-items: start; }
 .task-list { padding: 0; overflow: hidden; }
