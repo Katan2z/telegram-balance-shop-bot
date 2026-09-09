@@ -43,6 +43,12 @@ class NotificationSettingsTests(unittest.TestCase):
         self.assertNotIn("audience:", creation.split("});", 1)[0])
         self.assertIn("assigned_to: Number(assignedTo)", creation)
 
+    def test_admin_panel_has_explained_persistent_scenarios(self):
+        source = (ROOT / "docs" / "control" / "live-sections.js").read_text(encoding="utf-8")
+        self.assertIn("Постоянные уведомления", source)
+        self.assertIn("schedule_notify_interval_hours", source)
+        self.assertIn("Сначала выбери чат", source)
+
 
 if __name__ == "__main__":
     unittest.main()

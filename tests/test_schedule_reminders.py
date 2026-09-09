@@ -30,6 +30,14 @@ class ScheduleReminderTests(unittest.TestCase):
         self.assertFalse(reminders.reminder_is_due(saved, datetime(2026, 7, 28, 11, 59, tzinfo=timezone.utc)))
         self.assertTrue(reminders.reminder_is_due(saved, datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)))
 
+    def test_reminder_interval_can_be_configured(self):
+        saved = "2026-07-28T08:00:00+00:00"
+        now = datetime(2026, 7, 28, 10, 0, tzinfo=timezone.utc)
+        self.assertTrue(reminders.reminder_is_due(saved, now, 1))
+        self.assertFalse(reminders.reminder_is_due(saved, now, 4))
+        source = (ROOT / "bot_supabase.py").read_text(encoding="utf-8")
+        self.assertIn('SCHEDULE_NOTIFY_INTERVAL_KEY = "schedule_notify_interval_hours"', source)
+
     def test_automatic_reminders_start_on_sunday(self):
         self.assertFalse(reminders.reminder_window_open(datetime(2026, 8, 15, 12)))  # Saturday
         self.assertTrue(reminders.reminder_window_open(datetime(2026, 8, 16, 12)))   # Sunday

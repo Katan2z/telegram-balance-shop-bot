@@ -36,6 +36,7 @@ SCHEDULE_NOTIFY_ENABLED_KEY = "schedule_notify_enabled"
 SCHEDULE_NOTIFY_SETTING_KEY = "schedule_notify_chat_id"
 SCHEDULE_NOTIFY_THREAD_SETTING_KEY = "schedule_notify_thread_id"
 SCHEDULE_NOTIFY_LAST_SENT_KEY = "schedule_notify_last_sent_at"
+SCHEDULE_NOTIFY_INTERVAL_KEY = "schedule_notify_interval_hours"
 NOTIFICATION_TOGGLE_KEYS = {
     "managers": MANAGER_TASK_NOTIFY_ENABLED_KEY,
     "instructors": INSTRUCTOR_TASK_NOTIFY_ENABLED_KEY,
@@ -347,7 +348,12 @@ def schedule_target_week(local_now: datetime | None = None) -> str:
 
 
 def schedule_reminder_is_due(now_utc: datetime | None = None) -> bool:
-    return reminders.reminder_is_due(db.get_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY), now_utc)
+    saved_interval = db.get_setting(SCHEDULE_NOTIFY_INTERVAL_KEY)
+    try:
+        interval_hours = int(saved_interval or 4)
+    except (TypeError, ValueError):
+        interval_hours = 4
+    return reminders.reminder_is_due(db.get_setting(SCHEDULE_NOTIFY_LAST_SENT_KEY), now_utc, interval_hours)
 
 
 def is_management_profile(profile: dict, manager_ids: set[int] | None = None) -> bool:

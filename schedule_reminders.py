@@ -17,7 +17,7 @@ def target_week(local_now: datetime) -> str:
     return (local_now.date() + timedelta(days=days_until_next_monday)).isoformat()
 
 
-def reminder_is_due(last_sent: str | None, now_utc: datetime | None = None) -> bool:
+def reminder_is_due(last_sent: str | None, now_utc: datetime | None = None, interval_hours: int = 4) -> bool:
     if not last_sent:
         return True
     try:
@@ -27,7 +27,8 @@ def reminder_is_due(last_sent: str | None, now_utc: datetime | None = None) -> b
     except ValueError:
         return True
     current = now_utc or datetime.now(timezone.utc)
-    return current - sent_at >= REMINDER_INTERVAL
+    safe_hours = max(1, min(int(interval_hours or 4), 24))
+    return current - sent_at >= timedelta(hours=safe_hours)
 
 
 def is_management_profile(profile: dict, root_ids: set[int], manager_ids: set[int] | None = None) -> bool:

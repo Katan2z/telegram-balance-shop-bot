@@ -23,6 +23,10 @@ class AdminPanelDocumentsTests(unittest.TestCase):
         cleanup = self.source.index('if(previous)await storage(`object/employee-pvv/${previous}`')
         self.assertLess(metadata, cleanup)
 
+    def test_existing_pvv_can_be_deleted(self):
+        self.assertIn("deletePvv", self.source)
+        self.assertIn('method:"DELETE"', self.source)
+
 
 if __name__ == "__main__":
     unittest.main()

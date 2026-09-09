@@ -118,6 +118,15 @@ class ScheduleTests(unittest.TestCase):
         self.assertNotIn("JSON.stringify(data,null,2)", source)
         self.assertIn("entry.final_schedule?.[day[0]]||entry.availability?.[day[0]]", source)
 
+    def test_admin_panel_has_full_schedule_planner_controls(self):
+        source = (ROOT / "docs" / "control" / "live-sections.js").read_text(encoding="utf-8")
+        self.assertIn('id="schedulePrev"', source)
+        self.assertIn('id="scheduleNext"', source)
+        self.assertIn('id="scheduleSaveAll"', source)
+        self.assertIn('id="scheduleExport"', source)
+        self.assertIn("workbook.xlsx.writeBuffer()", source)
+        self.assertIn("schedulePresets", source)
+
 
 if __name__ == "__main__":
     unittest.main()
