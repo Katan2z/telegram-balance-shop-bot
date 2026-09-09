@@ -23,9 +23,10 @@
       ]);
       const med = new Map(medical.map(row => [String(row.employee_profile_id), row]));
       const docs = new Map(pvv.map(row => [String(row.employee_profile_id), row]));
-      root.innerHTML = `<div class="section-summary"><strong>${employees.length}</strong> сотрудников · <strong>${medical.length}</strong> сансправок · <strong>${pvv.length}</strong> бланков ПВВ</div>` + table(["Сотрудник","Санитарная справка","Санминимум","Флюорография","ПВВ",""], employees.map(employee => { const m=med.get(String(employee.id))||{}, p=docs.get(String(employee.id)); return `<tr><td><strong>${esc(employee.full_name)}</strong><small>${esc(employee.position||"")}</small></td><td>${date(m.sanitary_certificate_expires_on)}</td><td>${date(m.sanitary_minimum_expires_on)}</td><td>${date(m.fluorography_expires_on)}</td><td>${p?`<button class="secondary pvv-open" data-profile="${employee.id}">${esc(p.file_name||"Открыть")}</button>`:'<span class="status orange">Нет файла</span>'}</td><td><button class="secondary medical-edit" data-profile="${employee.id}">Изменить</button></td></tr>`; }));
+      root.innerHTML = `<div class="section-summary"><strong>${employees.length}</strong> сотрудников · <strong>${medical.length}</strong> сансправок · <strong>${pvv.length}</strong> бланков ПВВ</div>` + table(["Сотрудник","Санитарная справка","Санминимум","Флюорография","ПВВ","Действия"], employees.map(employee => { const m=med.get(String(employee.id))||{}, p=docs.get(String(employee.id)); return `<tr><td><strong>${esc(employee.full_name)}</strong><small>${esc(employee.position||"")}</small></td><td>${date(m.sanitary_certificate_expires_on)}</td><td>${date(m.sanitary_minimum_expires_on)}</td><td>${date(m.fluorography_expires_on)}</td><td>${p?`<button class="secondary pvv-open" data-profile="${employee.id}">${esc(p.file_name||"Открыть")}</button>`:'<span class="status orange">Нет файла</span>'}</td><td><div class="row-actions"><button class="secondary medical-edit" data-profile="${employee.id}">Сроки</button><button class="secondary pvv-upload" data-profile="${employee.id}">${p?'Заменить ПВВ':'Загрузить ПВВ'}</button></div></td></tr>`; }));
       root.querySelectorAll(".medical-edit").forEach(button=>button.onclick=()=>editMedical(Number(button.dataset.profile),med.get(String(button.dataset.profile))||{}));
       root.querySelectorAll(".pvv-open").forEach(button=>button.onclick=()=>openPvv(docs.get(String(button.dataset.profile))));
+      root.querySelectorAll(".pvv-upload").forEach(button=>button.onclick=()=>editPvv(Number(button.dataset.profile),employees.find(row=>Number(row.id)===Number(button.dataset.profile)),docs.get(String(button.dataset.profile))));
     } catch (error) { fail(root,error); }
   }
 
@@ -38,6 +39,48 @@
   async function openPvv(row){
     if(!row?.storage_path)return;
     try{const active=window.bk8Session();const config=window.APP_CONFIG||{};const response=await fetch(`${String(config.SUPABASE_URL).replace(/\/$/,"")}/storage/v1/object/sign/employee-pvv/${row.storage_path.split('/').map(encodeURIComponent).join('/')}`,{method:"POST",headers:{apikey:config.SUPABASE_ANON_KEY,Authorization:`Bearer ${active.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({expiresIn:600})});if(!response.ok)throw new Error(await response.text());const data=await response.json();window.open(`${String(config.SUPABASE_URL).replace(/\/$/,"")}/storage/v1${data.signedURL}`,'_blank','noopener');}catch(error){toast(error.message)}
+  }
+
+  function editPvv(profileId,employee,previous){
+    let dialog=document.querySelector("#pvvDialog");
+    if(!dialog){
+      document.body.insertAdjacentHTML("beforeend",'<dialog class="editor-dialog" id="pvvDialog"><form id="pvvForm"><div class="compose-head"><div><span class="eyebrow">БЛАНК ПВВ</span><h2 id="pvvEmployeeName">Загрузка документа</h2></div><button type="button" id="pvvClose">×</button></div><input type="hidden" id="pvvProfile"><input type="hidden" id="pvvPreviousPath"><label>PDF или фотография<input type="file" id="pvvFile" accept="application/pdf,image/jpeg,image/png,image/webp" required></label><p class="muted">PDF, JPG, PNG или WEBP, не больше 15 МБ.</p><p id="pvvStatus" class="login-error"></p><button class="primary" type="submit">Загрузить и сохранить</button></form></dialog>');
+      dialog=document.querySelector("#pvvDialog");
+      document.querySelector("#pvvClose").onclick=()=>dialog.close();
+      document.querySelector("#pvvForm").onsubmit=uploadPvv;
+    }
+    document.querySelector("#pvvProfile").value=profileId;
+    document.querySelector("#pvvPreviousPath").value=previous?.storage_path||"";
+    document.querySelector("#pvvEmployeeName").textContent=employee?.full_name||"Сотрудник";
+    document.querySelector("#pvvFile").value="";
+    document.querySelector("#pvvStatus").textContent="";
+    dialog.showModal();
+  }
+
+  async function storage(path,options={}){
+    const active=window.bk8Session();const config=window.APP_CONFIG||{};
+    const response=await fetch(`${String(config.SUPABASE_URL).replace(/\/$/,"")}/storage/v1/${path}`,{...options,headers:{apikey:config.SUPABASE_ANON_KEY,Authorization:`Bearer ${active.access_token}`,...(options.headers||{})}});
+    if(!response.ok)throw new Error(await response.text()||"Ошибка хранилища");
+    return response.status===204?null:response.json().catch(()=>null);
+  }
+
+  async function uploadPvv(event){
+    event.preventDefault();
+    const file=document.querySelector("#pvvFile").files?.[0],status=document.querySelector("#pvvStatus"),button=event.currentTarget.querySelector('[type="submit"]');
+    const allowed=new Set(["application/pdf","image/jpeg","image/png","image/webp"]);
+    if(!file||!allowed.has(file.type)){status.textContent="Выбери PDF, JPG, PNG или WEBP.";return;}
+    if(file.size>15*1024*1024){status.textContent="Файл больше 15 МБ.";return;}
+    const profileId=Number(document.querySelector("#pvvProfile").value),previous=document.querySelector("#pvvPreviousPath").value;
+    const extension=(file.name.split(".").pop()||"file").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const storagePath=`${profileId}/${crypto.randomUUID()}.${extension}`;
+    button.disabled=true;status.textContent="Загружаю…";
+    try{
+      await storage(`object/employee-pvv/${storagePath}`,{method:"POST",headers:{"Content-Type":file.type,"x-upsert":"false"},body:file});
+      await api("employee_pvv_documents?on_conflict=employee_profile_id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({employee_profile_id:profileId,storage_path:storagePath,file_name:file.name,mime_type:file.type,size_bytes:file.size,updated_by:actorId(),updated_at:new Date().toISOString()})});
+      if(previous)await storage(`object/employee-pvv/${previous}`,{method:"DELETE"}).catch(()=>{});
+      document.querySelector("#pvvDialog").close();toast("Бланк ПВВ сохранён");documents();
+    }catch(error){await storage(`object/employee-pvv/${storagePath}`,{method:"DELETE"}).catch(()=>{});status.textContent=error.message;}
+    finally{button.disabled=false;}
   }
 
   async function klokr() {
