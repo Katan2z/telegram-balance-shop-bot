@@ -6,7 +6,7 @@
   const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
 
   function session() {
-    try { return JSON.parse(sessionStorage.getItem("bk8_admin_session") || "null"); }
+    try { return JSON.parse(localStorage.getItem("bk8_admin_session") || sessionStorage.getItem("bk8_admin_session") || "null"); }
     catch (_) { return null; }
   }
 
@@ -138,7 +138,7 @@
     const [tasks, chats, profiles] = await Promise.all([
       api("admin_tasks?select=*&order=created_at.desc"),
       api("chats?type=neq.private&select=chat_id,title,type&order=title.asc"),
-      api("employee_profiles?select=telegram_id,full_name")
+      api("employee_profiles?select=telegram_id,full_name,position,activation_status")
     ]);
     const names = new Map(profiles.map(row => [String(row.telegram_id), row.full_name]));
     const list = document.querySelector(".task-list");
@@ -148,7 +148,11 @@
     chat.innerHTML = '<option value="">Выберите чат</option>' + chats.map(row => `<option value="${Number(row.chat_id)}">${esc(row.title)}</option>`).join("");
     document.querySelector("#chatNote").textContent = `Бот видит ${chats.length} чата`;
     const assignee = document.querySelector("#taskAssignee");
-    assignee.innerHTML = '<option value="">Выберите сотрудника</option>' + profiles.filter(row => row.telegram_id).map(row => `<option value="${Number(row.telegram_id)}">${esc(row.full_name)}</option>`).join("");
+    const recipients=profiles.filter(row=>row.telegram_id&&row.activation_status==='active');
+    const recipientOptions=recipients.map(row => `<option value="${Number(row.telegram_id)}">${esc(row.full_name)}${row.position?` · ${esc(row.position)}`:''}</option>`).join("");
+    const audience=document.querySelector("#taskAudience"),audienceHelp=document.querySelector("#taskAudienceHelp");
+    const drawAudience=()=>{const mode=audience.value;assignee.multiple=mode==='selected';assignee.size=mode==='selected'?Math.min(8,Math.max(4,recipients.length)):1;document.querySelector("#taskAssigneeLabel").classList.toggle("hidden",mode==='all');assignee.required=mode!=='all';assignee.innerHTML=(mode==='one'?'<option value="">Выберите сотрудника</option>':'')+recipientOptions;audienceHelp.textContent=mode==='all'?`Получат все активные сотрудники: ${recipients.length}`:mode==='selected'?'Можно выбрать несколько строк с Ctrl или Shift.':'Будет создана одна персональная задача.';};
+    audience.onchange=drawAudience;drawAudience();
     const due = new Date(); due.setDate(due.getDate() + 1); due.setMinutes(due.getMinutes() - due.getTimezoneOffset());
     document.querySelector("#taskDue").value = due.toISOString().slice(0, 16);
     document.querySelector("#taskForm").onsubmit = async event => {
@@ -157,10 +161,9 @@
       button.disabled = true; button.textContent = "Создаём…";
       try {
         const active = session()?.profile || {};
-        const payload = {
+        const basePayload = {
           title: document.querySelector("#taskTitle").value.trim(),
           description: document.querySelector("#taskDescription").value.trim(),
-          assigned_to: Number(document.querySelector("#taskAssignee").value),
           due_at: new Date(document.querySelector("#taskDue").value).toISOString(),
           priority: document.querySelector("#taskPriority").value,
           notification_chat_id: Number(document.querySelector("#taskChat").value),
@@ -168,9 +171,11 @@
           completed: false
         };
         const editId=Number(event.currentTarget.dataset.editId||0);
-        if(editId){delete payload.completed;delete payload.created_by;await api(`admin_tasks?id=eq.${editId}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(payload)});}
-        else await api("admin_tasks", {method:"POST", headers:{Prefer:"return=minimal"}, body:JSON.stringify(payload)});
-        toast(editId?"Задача обновлена":"Задача создана — бот отправит её в выбранный чат");
+        const mode=audience.value,selected=mode==='all'?recipients.map(row=>Number(row.telegram_id)):[...assignee.selectedOptions].map(option=>Number(option.value)).filter(Boolean);
+        if(!selected.length)throw new Error("Выберите хотя бы одного получателя");
+        if(editId){const payload={...basePayload,assigned_to:selected[0]};delete payload.completed;delete payload.created_by;await api(`admin_tasks?id=eq.${editId}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(payload)});}
+        else await api("admin_tasks", {method:"POST", headers:{Prefer:"return=minimal"}, body:JSON.stringify(selected.map(assigned_to=>({...basePayload,assigned_to})))});
+        toast(editId?"Задача обновлена":selected.length===1?"Задача создана — бот отправит её в выбранный чат":`Создано задач: ${selected.length}`);
         delete event.currentTarget.dataset.editId;
         originalTasks(); await loadTasks();
       } catch (error) { toast(error.message.includes("notification_chat_id") ? "Сначала примените миграцию маршрутизации задач" : error.message); }
@@ -187,7 +192,7 @@
     });
     list.querySelectorAll("[data-task-edit]").forEach(button=>button.onclick=()=>{
       const task=tasks.find(row=>Number(row.id)===Number(button.dataset.taskEdit));if(!task)return;
-      const form=document.querySelector("#taskForm");form.dataset.editId=task.id;document.querySelector("#taskTitle").value=task.title||"";document.querySelector("#taskDescription").value=task.description||"";document.querySelector("#taskAssignee").value=String(task.assigned_to||"");document.querySelector("#taskChat").value=String(task.notification_chat_id||"");document.querySelector("#taskPriority").value=task.priority||"normal";if(task.due_at){const due=new Date(task.due_at);due.setMinutes(due.getMinutes()-due.getTimezoneOffset());document.querySelector("#taskDue").value=due.toISOString().slice(0,16)}form.querySelector('[type="submit"]').textContent="Сохранить изменения";document.querySelector("#taskCompose").classList.add("visible");
+      const form=document.querySelector("#taskForm");form.dataset.editId=task.id;audience.value="one";drawAudience();document.querySelector("#taskTitle").value=task.title||"";document.querySelector("#taskDescription").value=task.description||"";document.querySelector("#taskAssignee").value=String(task.assigned_to||"");document.querySelector("#taskChat").value=String(task.notification_chat_id||"");document.querySelector("#taskPriority").value=task.priority||"normal";if(task.due_at){const due=new Date(task.due_at);due.setMinutes(due.getMinutes()-due.getTimezoneOffset());document.querySelector("#taskDue").value=due.toISOString().slice(0,16)}form.querySelector('[type="submit"]').textContent="Сохранить изменения";document.querySelector("#taskCompose").classList.add("visible");
     });
     list.querySelectorAll("[data-task-delete]").forEach(button => button.onclick = async () => {
       if (!confirm("Удалить выполненную задачу?")) return;

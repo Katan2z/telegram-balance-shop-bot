@@ -1,0 +1,13 @@
+{
+  "name": "BK8 STAFF Control",
+  "short_name": "BK8 Control",
+  "description": "Административная панель BK8 STAFF",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8f3ea",
+  "theme_color": "#4a2014",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
