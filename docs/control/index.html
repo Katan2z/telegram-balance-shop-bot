@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BK8 Control</title>
+  <meta name="theme-color" content="#4a2014">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=20260907-1">
-  <link rel="stylesheet" href="tasks.css?v=20260909-5">
+  <link rel="stylesheet" href="tasks.css?v=20260909-7">
 </head>
 <body>
   <section class="login" id="loginView">
@@ -16,6 +20,7 @@
       <p class="muted">Войдите под своей учётной записью.</p>
       <label>Логин<input id="username" autocomplete="username" required placeholder="Ваш логин"></label>
       <label>Пароль<div class="password"><input type="password" id="password" autocomplete="current-password" required placeholder="Ваш пароль"><button type="button" id="showPassword">Показать</button></div></label>
+      <label class="remember-device"><input type="checkbox" id="rememberDevice" checked><span><strong>Запомнить это устройство</strong><small>Не спрашивать логин и пароль при следующем входе</small></span></label>
       <p class="login-error" id="loginError"></p>
       <button class="primary" type="submit">Войти в панель</button>
       <small>Доступ выдаёт суперадминистратор</small>
@@ -36,8 +41,8 @@
   <div class="toast" id="toast"></div>
   <script src="../config.js?v=20260907-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="app.js?v=20260909-5"></script>
-  <script src="live-data.js?v=20260909-6"></script>
-  <script src="live-sections.js?v=20260909-5"></script>
+  <script src="app.js?v=20260909-7"></script>
+  <script src="live-data.js?v=20260909-7"></script>
+  <script src="live-sections.js?v=20260909-7"></script>
 </body>
 </html>

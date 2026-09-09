@@ -1,5 +1,6 @@
 .compact { width: auto; margin: 0; padding: 12px 18px; }
 .login-error { min-height: 20px; color: var(--red); font-size: 13px; font-weight: 700; margin: 12px 0 -10px; }
+.remember-device{display:flex;align-items:center;gap:11px;margin:18px 0 0;padding:12px;border-radius:12px;background:#f8edda;cursor:pointer}.remember-device input{width:19px;height:19px;margin:0}.remember-device span{flex:1}.remember-device strong,.remember-device small{display:block;text-align:left!important}.remember-device small{margin-top:3px}
 .role-banner { margin-bottom: 20px; border-radius: 15px; padding: 14px 18px; display: flex; align-items: center; gap: 13px; }
 .role-banner strong { white-space: nowrap; }
 .role-banner span { font-size: 13px; }
@@ -75,11 +76,13 @@
 .dots { border: 0; background: transparent; color: var(--muted); font-weight: 900; }
 .task-row-actions{display:flex;gap:2px}.task-row-actions .dots{font-size:18px;cursor:pointer}
 .section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 8px}.section-heading h3{margin:0!important}
+.dialog-error{display:none;margin-top:16px;padding:12px 14px;border-radius:12px;background:#ffe5df;color:#a7281c;font-size:13px;font-weight:700;white-space:pre-wrap;overflow-wrap:anywhere}.dialog-error:not(:empty){display:block}
 .compose { padding: 23px; position: sticky; top: 94px; height: auto; color: var(--ink); }
 .compose-head { display: flex; align-items: start; justify-content: space-between; }
 .compose-head h2 { margin: 7px 0; }
 .compose-head > button { border: 0; background: #f3e7d3; width: 32px; height: 32px; border-radius: 9px; font-size: 20px; }
 .compose label { margin: 18px 0 7px; }
+.field-help{display:block;color:var(--muted);font-weight:500;margin-top:6px}.compose select[multiple]{min-height:150px;padding:7px}.compose select[multiple] option{padding:8px;border-radius:7px}
 .compose textarea { width: 100%; min-height: 92px; resize: vertical; border: 1px solid var(--line); background: #fff; padding: 14px 16px; border-radius: 13px; color: var(--ink); outline: none; margin-top: 8px; font: inherit; }
 .chat-note { font-size: 12px; color: var(--green); background: #e4f5ed; padding: 9px 11px; border-radius: 9px; margin-top: 9px; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
