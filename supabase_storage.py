@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote, urlparse
 
@@ -238,6 +238,21 @@ def list_unnotified_admin_tasks(limit: int = 10) -> list[dict]:
 
 def mark_admin_task_notified(task_id: int) -> None:
     request("PATCH", f"admin_tasks?id=eq.{int(task_id)}", headers=headers("return=minimal"), json={"notified_at": now()})
+
+
+def list_due_admin_notifications(limit: int = 50) -> list[dict]:
+    due = quote(now(), safe="")
+    return request("GET", "admin_notifications?select=*" f"&is_active=eq.true&next_send_at=lte.{due}&order=next_send_at.asc&limit={limit}") or []
+
+
+def mark_admin_notification_sent(notification_id: int, repeat_hours: int | None = None) -> None:
+    sent_at = datetime.now(timezone.utc)
+    payload = {"last_sent_at": sent_at.isoformat()}
+    if repeat_hours:
+        payload["next_send_at"] = (sent_at + timedelta(hours=int(repeat_hours))).isoformat()
+    else:
+        payload["is_active"] = False
+    request("PATCH", f"admin_notifications?id=eq.{int(notification_id)}", headers=headers("return=minimal"), json=payload)
 
 
 def monthly_conversion_exists(month_key: str) -> bool:
