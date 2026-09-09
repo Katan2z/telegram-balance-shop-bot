@@ -109,24 +109,25 @@
 
   async function schedule() {
     const root=setPage("Расписание","Текущая неделя ресторана BK8");
-    try{
-      const monday=new Date();monday.setDate(monday.getDate()-((monday.getDay()+6)%7));const week=monday.toISOString().slice(0,10);
-      const rows=await api("rpc/schedule_get_week",{method:"POST",body:JSON.stringify({p_actor_id:actorId(),p_week_start:week})});
-      const data=rows?.entries||[];
-      const days=[['mon','ПН'],['tue','ВТ'],['wed','СР'],['thu','ЧТ'],['fri','ПТ'],['sat','СБ'],['sun','ВС']];
-      root.innerHTML=`<div class="schedule-toolbar"><label>Неделя<input id="scheduleWeek" type="date" value="${week}"></label><div><button class="secondary" id="scheduleOpen">Разблокировать</button><button class="secondary" id="scheduleClose">Заблокировать</button><button class="primary compact" id="schedulePublish">Опубликовать</button></div></div><div class="section-summary">Статус: <strong>${esc(rows?.week?.status||"collecting")}</strong> · ${data.length} сотрудников</div><div class="live-table-wrap"><table class="schedule-grid"><thead><tr><th>Сотрудник</th>${days.map(day=>`<th>${day[1]}</th>`).join('')}<th>Комментарий</th><th></th></tr></thead><tbody>${data.map(entry=>`<tr data-schedule-row="${Number(entry.employee_profile_id)}"><td><strong>${esc(entry.employee_name)}</strong><small>${esc(entry.work_type||'')}</small></td>${days.map(day=>`<td><input data-day="${day[0]}" value="${esc(entry.final_schedule?.[day[0]]||'')}"></td>`).join('')}<td><input data-comment value="${esc(entry.comment||'')}"></td><td><button class="secondary schedule-save">Сохранить</button></td></tr>`).join('')}</tbody></table></div>`;
-      document.querySelector("#scheduleWeek").onchange=event=>scheduleForWeek(event.target.value);
-      root.querySelectorAll(".schedule-save").forEach(button=>button.onclick=()=>saveScheduleRow(button.closest("tr"),week));
-      document.querySelector("#scheduleOpen").onclick=()=>setScheduleAccess(week,true);
-      document.querySelector("#scheduleClose").onclick=()=>setScheduleAccess(week,false);
-      document.querySelector("#schedulePublish").onclick=async()=>{try{await api("rpc/schedule_publish_week",{method:"POST",body:JSON.stringify({p_actor_id:actorId(),p_week_start:week})});toast("Расписание опубликовано");schedule();}catch(error){toast(error.message)}};
-    }catch(error){fail(root,error);}
+    const monday=new Date();monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
+    await scheduleForWeek(monday.toISOString().slice(0,10),root);
   }
 
-  async function scheduleForWeek(week){
+  async function scheduleForWeek(week,root=document.querySelector("#liveSection")){
     const monday=new Date(`${week}T12:00:00`);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
-    const normalized=monday.toISOString().slice(0,10);const root=document.querySelector("#liveSection");root.innerHTML='<div class="empty-live">Загрузка недели…</div>';
-    try{const rows=await api("rpc/schedule_get_week",{method:"POST",body:JSON.stringify({p_actor_id:actorId(),p_week_start:normalized})});const data=rows?.entries||[];root.innerHTML=`<div class="section-summary">Неделя с <strong>${date(normalized)}</strong></div><pre class="schedule-preview">${esc(JSON.stringify(data,null,2))}</pre><button class="secondary" onclick="openPage('schedule')">Вернуться к редактору текущей недели</button>`;}catch(error){fail(root,error)}
+    const normalized=monday.toISOString().slice(0,10);root.innerHTML='<div class="empty-live">Загрузка недели…</div>';
+    try{const rows=await api("rpc/schedule_get_week",{method:"POST",body:JSON.stringify({p_actor_id:actorId(),p_week_start:normalized})});renderScheduleEditor(root,normalized,rows);}catch(error){fail(root,error)}
+  }
+
+  function renderScheduleEditor(root,week,rows){
+    const data=rows?.entries||[],days=[['mon','ПН'],['tue','ВТ'],['wed','СР'],['thu','ЧТ'],['fri','ПТ'],['sat','СБ'],['sun','ВС']];
+    const status={collecting:"идёт сбор",open:"открыто",closed:"закрыто",published:"опубликовано"}[rows?.week?.status]||rows?.week?.status||"идёт сбор";
+    root.innerHTML=`<div class="schedule-toolbar"><label>Неделя<input id="scheduleWeek" type="date" value="${week}"></label><div><button class="secondary" id="scheduleOpen">Разблокировать</button><button class="secondary" id="scheduleClose">Заблокировать</button><button class="primary compact" id="schedulePublish">Опубликовать</button></div></div><div class="section-summary">Неделя с <strong>${date(week)}</strong> · статус: <strong>${esc(status)}</strong> · ${data.length} сотрудников</div><div class="live-table-wrap"><table class="schedule-grid"><thead><tr><th>Сотрудник</th>${days.map(day=>`<th>${day[1]}</th>`).join('')}<th>Комментарий</th><th></th></tr></thead><tbody>${data.map(entry=>`<tr data-schedule-row="${Number(entry.employee_profile_id)}"><td><strong>${esc(entry.employee_name)}</strong><small>${esc(entry.work_type||'')}</small></td>${days.map(day=>{const value=entry.final_schedule?.[day[0]]||entry.availability?.[day[0]]||'';return `<td><input data-day="${day[0]}" value="${esc(value)}"></td>`}).join('')}<td><input data-comment value="${esc(entry.comment||'')}"></td><td><button class="secondary schedule-save">Сохранить</button></td></tr>`).join('')||'<tr><td colspan="10" class="empty-live">На эту неделю сотрудников нет</td></tr>'}</tbody></table></div>`;
+    root.querySelector("#scheduleWeek").onchange=event=>scheduleForWeek(event.target.value,root);
+    root.querySelectorAll(".schedule-save").forEach(button=>button.onclick=()=>saveScheduleRow(button.closest("tr"),week));
+    root.querySelector("#scheduleOpen").onclick=()=>setScheduleAccess(week,true);
+    root.querySelector("#scheduleClose").onclick=()=>setScheduleAccess(week,false);
+    root.querySelector("#schedulePublish").onclick=async()=>{try{await api("rpc/schedule_publish_week",{method:"POST",body:JSON.stringify({p_actor_id:actorId(),p_week_start:week})});toast("Расписание опубликовано");scheduleForWeek(week,root);}catch(error){toast(error.message)}};
   }
 
   async function saveScheduleRow(row,week){
@@ -136,7 +137,7 @@
     catch(error){toast(error.message)}finally{button.disabled=false}
   }
 
-  async function setScheduleAccess(week,open){try{await api("rpc/schedule_set_input_access",{method:"POST",body:JSON.stringify({p_actor_id:actorId(),p_week_start:week,p_open:open})});toast(open?"Заполнение открыто":"Заполнение закрыто");schedule();}catch(error){toast(error.message)}}
+  async function setScheduleAccess(week,open){try{await api("rpc/schedule_set_input_access",{method:"POST",body:JSON.stringify({p_actor_id:actorId(),p_week_start:week,p_open:open})});toast(open?"Заполнение открыто":"Заполнение закрыто");scheduleForWeek(week);}catch(error){toast(error.message)}}
 
   async function feedback() {
     const root=setPage("Жалобы и предложения","Обращения сотрудников BK8");

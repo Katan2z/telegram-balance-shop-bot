@@ -112,6 +112,12 @@ class ScheduleTests(unittest.TestCase):
         self.assertIn('data-day-mode="ft"', source)
         self.assertIn('value.value = "ФТ"', source)
 
+    def test_admin_panel_history_uses_the_normal_editor_not_raw_json(self):
+        source = (ROOT / "docs" / "control" / "live-sections.js").read_text(encoding="utf-8")
+        self.assertIn("renderScheduleEditor(root,normalized,rows)", source)
+        self.assertNotIn("JSON.stringify(data,null,2)", source)
+        self.assertIn("entry.final_schedule?.[day[0]]||entry.availability?.[day[0]]", source)
+
 
 if __name__ == "__main__":
     unittest.main()
