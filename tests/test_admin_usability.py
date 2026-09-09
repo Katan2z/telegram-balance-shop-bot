@@ -39,6 +39,9 @@ class AdminUsabilityTests(unittest.TestCase):
     def test_shop_errors_are_visible_inside_the_dialog(self):
         self.assertIn('id="shopItemError" role="alert"', self.sections)
         self.assertIn("errorBox.textContent", self.sections)
+        migration = Path("docs/migrations/20260909_feedback_management.sql").read_text(encoding="utf-8")
+        self.assertIn("public.admin_save_shop_item", migration)
+        self.assertIn('api("rpc/admin_save_shop_item"', self.sections)
 
 
 if __name__ == "__main__":

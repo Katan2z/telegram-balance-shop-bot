@@ -23,7 +23,7 @@ class AdminCrudTests(unittest.TestCase):
 
     def test_shop_catalog_can_be_created_edited_and_hidden(self):
         self.assertIn('id="shopItemAdd"', self.sections)
-        self.assertIn('shop_items?id=eq.${id}', self.sections)
+        self.assertIn('rpc/admin_save_shop_item', self.sections)
         self.assertIn("is_active:document.querySelector", self.sections)
 
 
