@@ -49,6 +49,7 @@
     const expiring = medical.filter(row => [row.sanitary_certificate_expires_on, row.sanitary_minimum_expires_on, row.fluorography_expires_on]
       .some(value => value && new Date(value) >= now && new Date(value) <= soon)).length;
     const openTasks = tasks.filter(item => !item.completed).length;
+    if (document.querySelector("#crumb")?.textContent !== "Обзор") return;
     const stats = document.querySelectorAll(".stats .stat");
     if (stats[0]) { stats[0].querySelector("strong").textContent = profiles.length; stats[0].querySelector(".trend").textContent = `${active.length} активны`; }
     if (stats[2]) { stats[2].querySelector("strong").textContent = expiring; stats[2].querySelector(".trend").textContent = "истекают в течение месяца"; }

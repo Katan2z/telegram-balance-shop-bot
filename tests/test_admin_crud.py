@@ -18,6 +18,9 @@ class AdminCrudTests(unittest.TestCase):
         self.assertIn("data-task-toggle", self.data)
         self.assertIn("data-task-delete", self.data)
 
+    def test_overview_async_result_does_not_overwrite_another_page(self):
+        self.assertIn('textContent !== "Обзор"', self.data)
+
     def test_shop_catalog_can_be_created_edited_and_hidden(self):
         self.assertIn('id="shopItemAdd"', self.sections)
         self.assertIn('shop_items?id=eq.${id}', self.sections)
