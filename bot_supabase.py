@@ -477,6 +477,34 @@ async def notify_new_tasks_loop(bot: Bot):
             await asyncio.sleep(30)
 
 
+def custom_notification_text(notification: dict) -> str:
+    text = escape(str(notification.get("message") or "").strip())
+    mentions = []
+    for telegram_id in notification.get("recipient_ids") or []:
+        try:
+            user_id = int(telegram_id)
+            mentions.append(f'<a href="tg://user?id={user_id}">{escape(name_for(user_id))}</a>')
+        except (TypeError, ValueError):
+            continue
+    title = escape(str(notification.get("title") or "Уведомление"))
+    return f"🔔 <b>{title}</b>\n\n{text}" + (f"\n\n{' · '.join(mentions)}" if mentions else "")
+
+
+async def custom_notification_loop(bot: Bot):
+    await asyncio.sleep(8)
+    while True:
+        try:
+            for notification in db.list_due_admin_notifications():
+                try:
+                    await send_topic_html(bot, int(notification["chat_id"]), custom_notification_text(notification), int(notification["thread_id"]) if notification.get("thread_id") else None)
+                    db.mark_admin_notification_sent(int(notification["id"]), notification.get("repeat_hours"))
+                except Exception as error:
+                    print(f"Custom notification send error: {error}")
+        except Exception as error:
+            print(f"Custom notification loop error: {error}")
+        await asyncio.sleep(15)
+
+
 async def monthly_reset_loop(bot: Bot):
     await asyncio.sleep(10)
     while True:
@@ -895,6 +923,7 @@ async def main():
     dp.include_router(router)
     asyncio.create_task(notify_new_tasks_loop(bot))
     asyncio.create_task(schedule_reminder_loop(bot))
+    asyncio.create_task(custom_notification_loop(bot))
     asyncio.create_task(monthly_reset_loop(bot))
     await dp.start_polling(bot)
 
