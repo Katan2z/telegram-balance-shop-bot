@@ -25,6 +25,9 @@ class AdminCrudTests(unittest.TestCase):
         self.assertIn('id="shopItemAdd"', self.sections)
         self.assertIn('rpc/admin_save_shop_item', self.sections)
         self.assertIn("is_active:document.querySelector", self.sections)
+        self.assertIn('id="shopItemDelete"', self.sections)
+        self.assertIn("async function deleteShopItem", self.sections)
+        self.assertIn("p_is_active:false", self.sections)
 
 
 if __name__ == "__main__":
