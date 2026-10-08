@@ -10,7 +10,8 @@ class CustomNotificationTests(unittest.TestCase):
         runner = (ROOT / "bot_runner.py").read_text(encoding="utf-8")
         self.assertIn("async def custom_notification_loop", bot)
         self.assertIn('tg://user?id=', bot)
-        self.assertIn("app.custom_notification_loop(bot)", runner)
+        self.assertIn("app.run_bot((priority_router,))", runner)
+        self.assertIn("custom_notification_loop, monthly_reset_loop", bot)
 
     def test_panel_has_notification_editor(self):
         panel = (ROOT / "docs/control/live-sections.js").read_text(encoding="utf-8")

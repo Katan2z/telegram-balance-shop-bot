@@ -21,7 +21,7 @@ class TimesheetParserTests(unittest.TestCase):
         self.assertEqual(1, len(rows))
         self.assertEqual(7, rows[0]["profile_id"])
         self.assertEqual(168.5, rows[0]["hours"])
-        save_current.assert_called_once_with(rows)
+        save_current.assert_not_called()
 
     @patch("timesheet_import.save_current")
     def test_invalid_or_excessive_hours_are_ignored(self, save_current):
@@ -32,7 +32,7 @@ class TimesheetParserTests(unittest.TestCase):
             rows = parse_timesheet(path, profiles)
 
         self.assertEqual([], rows)
-        save_current.assert_called_once_with([])
+        save_current.assert_not_called()
 
 
 if __name__ == "__main__":
