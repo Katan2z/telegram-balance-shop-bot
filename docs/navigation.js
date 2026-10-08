@@ -51,7 +51,8 @@ function setupSimpleNavigation() {
   const buttons = Array.from(tabs.querySelectorAll(".tab[data-tab]")).filter(button => !button.classList.contains("nav-hidden-tab"));
   for (const button of buttons) {
     const tabName = button.dataset.tab;
-    button.textContent = navLabelFor(tabName);
+    const label = navLabelFor(tabName);
+    if (button.textContent !== label) button.textContent = label;
     if (PRIMARY_TABS.has(tabName)) {
       button.classList.remove("nav-hidden-tab");
       button.style.display = "";
@@ -86,16 +87,27 @@ function setupSimpleNavigation() {
   navBindActions();
 }
 
-const navObserver = new MutationObserver(() => setTimeout(setupSimpleNavigation, 0));
+let navUpdateQueued = false;
+const navObserver = new MutationObserver(() => {
+  if (navUpdateQueued) return;
+  navUpdateQueued = true;
+  queueMicrotask(() => {
+    navUpdateQueued = false;
+    setupSimpleNavigation();
+    if (typeof navCleanQuickActions === 'function') navCleanQuickActions();
+  });
+});
+let navStarted = false;
 const navStart = () => {
+  if (navStarted) return;
   const tabs = document.getElementById("tabs");
   if (!tabs) return;
+  navStarted = true;
   setupSimpleNavigation();
   navObserver.observe(tabs, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
 };
 
-document.addEventListener("DOMContentLoaded", navStart);
+if (document.readyState === 'loading') document.addEventListener("DOMContentLoaded", navStart, {once: true});
+else navStart();
 window.addEventListener("bk8:feedback-ready", setupSimpleNavigation);
-setTimeout(navStart, 300);
-setTimeout(setupSimpleNavigation, 1200);
-setInterval(setupSimpleNavigation, 2500);
+window.addEventListener('bk8:app-ready', navStart, {once: true});

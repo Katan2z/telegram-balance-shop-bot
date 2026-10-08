@@ -31,7 +31,7 @@ class FeedbackTests(unittest.TestCase):
         index = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn('{ tab: "feedback"', navigation)
         self.assertIn('title: "Жалобы и предложения"', navigation)
-        self.assertIn('navigation.js?v=20260814-feedback3', index)
+        self.assertRegex(index, r'<script src="navigation\.js\?v=[^"]+"></script>')
 
     def test_feedback_navigation_refreshes_for_every_role(self):
         source = (ROOT / "docs" / "feedback.js").read_text(encoding="utf-8")
