@@ -904,7 +904,7 @@ async def admin_remove_callback(callback: CallbackQuery):
     await callback.answer()
 
 
-async def main():
+async def run_bot(extra_routers=()):
     token = os.getenv("BOT_TOKEN")
     if not token:
         raise RuntimeError("BOT_TOKEN не указан")
@@ -920,12 +920,25 @@ async def main():
     )
     print(f"Mini App menu updated: {MINI_APP_URL}")
     dp = Dispatcher()
+    for extra_router in extra_routers:
+        dp.include_router(extra_router)
     dp.include_router(router)
-    asyncio.create_task(notify_new_tasks_loop(bot))
-    asyncio.create_task(schedule_reminder_loop(bot))
-    asyncio.create_task(custom_notification_loop(bot))
-    asyncio.create_task(monthly_reset_loop(bot))
-    await dp.start_polling(bot)
+    jobs = [asyncio.create_task(worker(bot)) for worker in (
+        notify_new_tasks_loop, schedule_reminder_loop,
+        custom_notification_loop, monthly_reset_loop,
+    )]
+    try:
+        await dp.start_polling(bot)
+    finally:
+        for job in jobs:
+            job.cancel()
+        await asyncio.gather(*jobs, return_exceptions=True)
+        await bot.session.close()
+
+
+async def main():
+    from bot_runner import priority_router
+    await run_bot((priority_router,))
 
 
 if __name__ == "__main__":

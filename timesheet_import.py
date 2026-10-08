@@ -197,7 +197,6 @@ def parse_timesheet(path: Path, profiles):
         })
 
     result = sorted(result, key=lambda item: item.get("full_name") or "")
-    save_current(result)
     return result
 
 
