@@ -241,6 +241,8 @@ def mark_admin_task_notified(task_id: int) -> None:
 
 
 def list_due_admin_notifications(limit: int = 50) -> list[dict]:
+    if os.getenv('NOTIFICATION_QUEUE_ENABLED') == '1':
+        return request('POST', 'rpc/claim_admin_notifications', json={'p_limit': 1}) or []
     due = quote(now(), safe="")
     return request("GET", "admin_notifications?select=*" f"&is_active=eq.true&next_send_at=lte.{due}&order=next_send_at.asc&limit={limit}") or []
 
@@ -253,6 +255,16 @@ def mark_admin_notification_sent(notification_id: int, repeat_hours: int | None 
     else:
         payload["is_active"] = False
     request("PATCH", f"admin_notifications?id=eq.{int(notification_id)}", headers=headers("return=minimal"), json=payload)
+
+
+def finish_notification_delivery(notification: dict, error: str | None = None) -> bool:
+    if notification.get('lease_token'):
+        return bool(request('POST', 'rpc/finish_admin_notification', json={
+            'p_id': notification['id'], 'p_token': notification['lease_token'], 'p_error': error,
+        }))
+    if error is None:
+        mark_admin_notification_sent(int(notification['id']), notification.get('repeat_hours'))
+    return True
 
 
 def monthly_conversion_exists(month_key: str) -> bool:
