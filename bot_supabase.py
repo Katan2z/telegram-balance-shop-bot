@@ -501,9 +501,10 @@ async def custom_notification_loop(bot: Bot):
                 try:
                     for text in notification_messages.messages(notification, profiles or []):
                         await send_topic_html(bot, int(notification["chat_id"]), text, int(notification["thread_id"]) if notification.get("thread_id") else None)
-                    await asyncio.to_thread(db.mark_admin_notification_sent, int(notification["id"]), notification.get("repeat_hours"))
+                    await asyncio.to_thread(db.finish_notification_delivery, notification)
                 except Exception as error:
                     print(f"Custom notification send error: {error}")
+                    await asyncio.to_thread(db.finish_notification_delivery, notification, str(error)[:1000])
         except Exception as error:
             print(f"Custom notification loop error: {error}")
         await asyncio.sleep(15)
