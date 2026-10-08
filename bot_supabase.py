@@ -16,6 +16,7 @@ from aiogram.types import (
 
 import supabase_storage as db
 import schedule_reminders as reminders
+import notification_messages
 
 BOT_USERNAME = os.getenv("BOT_USERNAME", "bk8_shop_bot")
 MINI_APP_RELEASE = os.getenv("MINI_APP_RELEASE", "20260718-schedule5")
@@ -494,10 +495,13 @@ async def custom_notification_loop(bot: Bot):
     await asyncio.sleep(8)
     while True:
         try:
-            for notification in db.list_due_admin_notifications():
+            notifications = await asyncio.to_thread(db.list_due_admin_notifications)
+            profiles = await asyncio.to_thread(db.request, 'GET', 'employee_profiles?activation_status=eq.active&select=telegram_id,full_name,activation_status') if notifications else []
+            for notification in notifications:
                 try:
-                    await send_topic_html(bot, int(notification["chat_id"]), custom_notification_text(notification), int(notification["thread_id"]) if notification.get("thread_id") else None)
-                    db.mark_admin_notification_sent(int(notification["id"]), notification.get("repeat_hours"))
+                    for text in notification_messages.messages(notification, profiles or []):
+                        await send_topic_html(bot, int(notification["chat_id"]), text, int(notification["thread_id"]) if notification.get("thread_id") else None)
+                    await asyncio.to_thread(db.mark_admin_notification_sent, int(notification["id"]), notification.get("repeat_hours"))
                 except Exception as error:
                     print(f"Custom notification send error: {error}")
         except Exception as error:
