@@ -85,33 +85,26 @@ def save_chat(chat) -> None:
 
 
 def auto_convert_user_balance(user_id: int) -> dict:
-    rows = request("GET", f"users?telegram_id=eq.{user_id}&select=balance,coins,coin_checkpoint&limit=1") or []
-    if not rows:
-        return {"balance": 0, "coins": 0, "added_coins": 0, "checkpoint": 0}
-
-    row = rows[0]
-    balance = int(row.get("balance", 0) or 0)
-    current_coins = int(row.get("coins", 0) or 0)
-    checkpoint = int(row.get("coin_checkpoint", 0) or 0)
-    earned_checkpoint = balance // 5
-    coins_to_add = max(earned_checkpoint - checkpoint, 0)
-
-    if coins_to_add <= 0:
-        return {"balance": balance, "coins": current_coins, "added_coins": 0, "checkpoint": checkpoint}
-
-    new_coins = current_coins + coins_to_add
-    request(
-        "PATCH",
-        f"users?telegram_id=eq.{user_id}",
-        headers=headers("return=minimal"),
-        json={"coins": new_coins, "coin_checkpoint": earned_checkpoint, "updated_at": now()},
-    )
-    return {
-        "balance": balance,
-        "coins": new_coins,
-        "added_coins": coins_to_add,
-        "checkpoint": earned_checkpoint,
-    }
+    """Convert using compare-and-swap; never overwrite a concurrent purchase."""
+    for _ in range(8):
+        rows = request("GET", f"users?telegram_id=eq.{int(user_id)}&select=balance,coins,coin_checkpoint&limit=1") or []
+        if not rows:
+            return {"balance": 0, "coins": 0, "added_coins": 0, "checkpoint": 0}
+        row = rows[0]
+        balance, coins, checkpoint = (int(row.get(key, 0) or 0) for key in ("balance", "coins", "coin_checkpoint"))
+        earned = balance // 5
+        added = max(earned - checkpoint, 0)
+        if not added:
+            return {"balance": balance, "coins": coins, "added_coins": 0, "checkpoint": checkpoint}
+        updated = request(
+            "PATCH",
+            f"users?telegram_id=eq.{int(user_id)}&balance=eq.{balance}&coins=eq.{coins}&coin_checkpoint=eq.{checkpoint}",
+            headers=headers("return=representation"),
+            json={"coins": coins + added, "coin_checkpoint": earned, "updated_at": now()},
+        )
+        if updated:
+            return {"balance": balance, "coins": coins + added, "added_coins": added, "checkpoint": earned}
+    raise RuntimeError("Баланс изменяется параллельно. Повторите операцию позже.")
 
 
 def change_balance(user_id: int, amount: int, admin_id: int | None = None, comment: str = "") -> int:
