@@ -313,7 +313,7 @@ function tasksInit() {
     if (createBtn) createBtn.onclick = tasksCreate;
     if (refreshBtn) refreshBtn.onclick = () => tasksLoad().catch(() => {});
     if (audienceSelect) audienceSelect.onchange = tasksRenderAssignees;
-    setInterval(() => tasksLoad().catch(() => {}), 10000);
+    window.bk8PollSection('tab-tasks', 10000, tasksLoad);
   }).catch(() => {});
 }
 

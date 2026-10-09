@@ -341,4 +341,4 @@ function shopAdminInjectStyle() {
 shopAdminInjectStyle();
 shopBuildSection();
 shopLoad().catch(() => {});
-setInterval(() => shopLoad().catch(() => {}), 15000);
+window.bk8PollSection('tab-shop', 15000, shopLoad);
