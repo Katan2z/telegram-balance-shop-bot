@@ -372,4 +372,4 @@ async function instructorLoad() {
 }
 
 instructorLoad().catch(() => {});
-setInterval(() => instructorLoad().catch(() => {}), 20000);
+window.bk8PollSection('tab-instructor', 20000, () => instructorLoad());

@@ -437,14 +437,10 @@ function closingInit() {
     const status = document.getElementById("closingStatus");
     if (status) status.textContent = "Раздел готов, но нужны таблицы Supabase для сохранения.";
   });
-  setInterval(() => {
-    const newKey = closingTodayKey();
-    if (newKey !== closingState.workday) closingLoadData().catch(() => {});
-  }, 60000);
-  setInterval(() => {
-    closingLoadData().catch(() => {});
-    if (closingState.historyOpen && closingState.historySelectedDay) closingLoadHistoryDay(closingState.historySelectedDay).catch(() => {});
-  }, 10000);
+  window.bk8PollSection('tab-closing', 10000, async () => {
+    await closingLoadData();
+    if (closingState.historyOpen && closingState.historySelectedDay) await closingLoadHistoryDay(closingState.historySelectedDay);
+  });
 }
 
 closingInit();
