@@ -93,8 +93,15 @@ const navObserver = new MutationObserver(() => {
   navUpdateQueued = true;
   queueMicrotask(() => {
     navUpdateQueued = false;
-    setupSimpleNavigation();
-    if (typeof navCleanQuickActions === 'function') navCleanQuickActions();
+    // Our own class updates must not enqueue another observer callback.
+    navObserver.disconnect();
+    try {
+      setupSimpleNavigation();
+      if (typeof navCleanQuickActions === 'function') navCleanQuickActions();
+    } finally {
+      const tabs = document.getElementById('tabs');
+      if (tabs) navObserver.observe(tabs, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
   });
 });
 let navStarted = false;
