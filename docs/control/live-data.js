@@ -11,11 +11,12 @@
   }
 
   async function api(path, options = {}) {
-    const active = session();
+    let active = await window.bk8AccessSession();
     const config = window.APP_CONFIG || {};
     if (!active?.access_token) throw new Error("Сессия завершена. Войдите снова.");
-    const response = await fetch(`${String(config.SUPABASE_URL).replace(/\/$/, "")}/rest/v1/${path}`, {
+    const send = () => fetch(`${String(config.SUPABASE_URL).replace(/\/$/, "")}/rest/v1/${path}`, {
       ...options,
+      signal: options.signal || AbortSignal.timeout(20000),
       headers: {
         apikey: config.SUPABASE_ANON_KEY,
         Authorization: `Bearer ${active.access_token}`,
@@ -23,8 +24,18 @@
         ...(options.headers || {})
       }
     });
+    let response = await send();
+    if (response.status === 401) {
+      active = await window.bk8AccessSession(true);
+      response = await send();
+    }
     if (response.status === 401) throw new Error("Сессия завершена. Войдите снова.");
-    if (!response.ok) throw new Error(await response.text() || "Не удалось загрузить данные");
+    if (!response.ok) {
+      const body = await response.text();
+      let message = body;
+      try { const details = JSON.parse(body); message = details.message || details.hint || body; } catch (_) {}
+      throw new Error(`Ошибка ${response.status}: ${message || 'Не удалось загрузить данные'}`);
+    }
     if (response.status === 204 || options.headers?.Prefer === "return=minimal") return null;
     return response.json();
   }
@@ -33,7 +44,7 @@
 
   function showLoadError(error) {
     console.error(error);
-    window.showDemo?.("Не удалось загрузить данные");
+    toast(error.message || 'Не удалось загрузить данные');
   }
 
   async function loadOverview() {
