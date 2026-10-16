@@ -49,6 +49,7 @@
     root.querySelectorAll('[data-profile],#plannerBands').forEach(input=>input.onchange=()=>{const key=input.dataset.profile||'bands';try{const value=JSON.parse(input.value);if(!Array.isArray(value))throw Error('Ожидается массив');if(input.dataset.profile)state.config.profiles[input.dataset.profile]=value;else state.config.bands=value;delete state.invalidInputs[key];markDirty();}catch(e){state.invalidInputs[key]=input.value;state.dirty=true;setStatus(`Не сохранено: ${e.message}. Исправьте поле перед расчётом.`,true);}});
     root.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{state.shifts=state.shifts.filter(s=>`${s.employeeId}/${s.day}`!==b.dataset.remove);markDirty();render();});
     root.querySelectorAll('[data-shift]').forEach(input=>input.onchange=()=>{const key=input.dataset.shift+'/'+input.dataset.key;try{editShift(input);delete state.invalidInputs[key];markDirty();}catch(e){state.invalidInputs[key]=input.value;state.dirty=true;setStatus(e.message,true);}});
+    root.querySelectorAll('input[data-config],input[data-shift],input[data-event],textarea[data-profile],#plannerBands').forEach(input=>{input.oninput=input.onchange;});
     const actual=root.querySelector('#plannerActuals');if(actual)actual.onchange=()=>previewActuals(actual.files[0]).catch(e=>setStatus(e.message,true));
   }
   function editShift(input) {
