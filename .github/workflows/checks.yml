@@ -23,6 +23,7 @@ jobs:
       - run: node tests/navigation_observer.cjs
       - run: node tests/admin_session.cjs
       - run: node tests/planner_engine.cjs
+      - run: node tests/planner_async.cjs
       - run: npm install --prefix .audit-runtime --no-save --ignore-scripts @electric-sql/pglite@0.3.14
       - run: node tests/planner_database.mjs
         env:

@@ -64,10 +64,12 @@
     if(s)input.closest('tr').querySelector('[data-key="locked"]').checked=s.locked;
   }
   async function action(name) {
+    const owner=state,epoch=job;
     if(['generate','save','publish'].includes(name)&&Object.keys(state.invalidInputs).length)throw Error('Исправьте некорректно введённые поля: '+Object.keys(state.invalidInputs).join(', '));
     if(name==='addEvent'){state.config.events.push({day:'mon',title:'',start:720,end:840,percent:0,laborPercent:0,included:false});markDirty();render();return;}
     if(name==='weatherHistory') {
       const history=state.preview?{snapshots:[],actuals:[]}:await rpc('planner_weather_history',{});
+      if(state!==owner||job!==epoch)return;
       const actuals=new Map(history.actuals.map(x=>[`${x.date}/${x.hour}`,x]));state.config.actuals.forEach(x=>actuals.set(`${x.date}/${x.hour}`,x));
       const suggestions=P.weatherSuggestions([state.config,...history.snapshots],[...actuals.values()],state.config.weatherRules),names={rainPercent:'Дождь',coldPercent:'Холод',heatPercent:'Жара',windPercent:'Ветер'};
       const root=document.querySelector('#weatherSuggestions');root.innerHTML=suggestions.map(s=>`<p>${names[s.key]}: ${s.percent===null?'недостаточно данных':`${s.percent.toFixed(1)}%`} · дней с условием ${s.exposed}, без ${s.controls} ${s.percent!==null?`<button data-apply-weather="${s.key}">Применить вручную</button>`:''}</p>`).join('');
@@ -83,7 +85,7 @@
     }
     if(name==='refresh') {
       if(state.preview){setStatus('Демонстрационные возможности уже загружены');return;}
-      const latest=await rpc('planner_get_week',{p_week:state.week});state.stale=state.stale||latest.sourceHash!==state.sourceHash;state.employees=latest.employees;state.sourceHash=latest.sourceHash;render();setStatus(state.stale?'Возможности изменились. Ручные смены сохранены, нужен пересчёт.':'Возможности актуальны');return;
+      const latest=await rpc('planner_get_week',{p_week:state.week});if(state!==owner||job!==epoch)return;state.stale=state.stale||latest.sourceHash!==state.sourceHash;state.employees=latest.employees;state.sourceHash=latest.sourceHash;render();setStatus(state.stale?'Возможности изменились. Ручные смены сохранены, нужен пересчёт.':'Возможности актуальны');return;
     }
     if(name==='save'||name==='publish') {
       if(state.preview){setStatus('Предпросмотр: сохранение и публикация в ресторан отключены');return;}
@@ -91,13 +93,19 @@
       if(state.stale)throw Error('Пересчитайте черновик после обновления возможностей');
       const {d,r}=report();if(name==='publish'&&(d.errors.length||r.errors.length))throw Error([...d.errors,...r.errors].slice(0,8).join('; '));
       if(name==='publish'&&!confirm(`Опубликовать неделю ${state.week}? ${r.warnings.join('. ')}. Проверьте покрытие и SPMH. Это изменит расписание, видимое сотрудникам.`))return;
-      const version=await rpc('planner_save_week',{p_week:state.week,p_version:state.version,p_source_hash:state.sourceHash,p_document:{config:state.config,shifts:state.shifts}});state.version=version;state.dirty=false;
-      if(name==='publish')await rpc('planner_publish_week',{p_week:state.week,p_version:state.version,p_acknowledge:true});
-      setStatus(name==='save'?`Черновик сохранён, версия ${version}. Не опубликован.`:'Расписание опубликовано');return;
+      const week=owner.week,document=JSON.parse(JSON.stringify({config:owner.config,shifts:owner.shifts}));
+      const version=await rpc('planner_save_week',{p_week:week,p_version:owner.version,p_source_hash:owner.sourceHash,p_document:document});owner.version=version;
+      const unchanged=JSON.stringify({config:owner.config,shifts:owner.shifts})===JSON.stringify(document)&&!Object.keys(owner.invalidInputs).length;
+      owner.dirty=!unchanged;
+      if(state!==owner||job!==epoch)return;
+      if(!unchanged)throw Error('Предыдущая редакция сохранена, но появились новые правки. Публикация отменена; сохраните ещё раз.');
+      if(name==='publish')await rpc('planner_publish_week',{p_week:week,p_version:version,p_acknowledge:true});
+      if(state!==owner||job!==epoch)return;
+      setStatus(name==='save'?`Черновик сохранён, версия ${version}. Не опубликован.`:owner.dirty?'Версия опубликована; новые правки ещё не сохранены':'Расписание опубликовано');return;
     }
     if(name==='export'){await exportExcel();return;}
     if(name==='weather') {
-      const w=await window.BK8PlannerWeather.load();state.config.weather=w;state.dirty=true;render();setStatus('Погода обновлена. Настройки коэффициентов не менялись.');return;
+      const w=await window.BK8PlannerWeather.load();if(state!==owner||job!==epoch)return;state.config.weather=w;state.dirty=true;render();setStatus('Погода обновлена. Настройки коэффициентов не менялись.');return;
     }
     if(name==='history') {
       if(!state.config.actuals.length)throw Error('Сначала импортируйте фактические продажи');
@@ -141,7 +149,7 @@
       if(!loaded.document&&loaded.defaults){const fresh=P.defaults();state.config={...fresh,...loaded.defaults,weekStart:week,forecasts:fresh.forecasts,events:[]};}
       if(preview){state.config.reviewed=true;state.config.spmh=150;P.DAYS.forEach(d=>state.config.forecasts[d]={revenue:10000,checks:600,averageCheck:null});state.employees.forEach(e=>state.config.skills[e.employee_profile_id]={roles:['kitchen','cashier'],training:false});}
       render();
-    }catch(e){root.innerHTML=`<h1>Планировщик</h1><p role="alert">${escape(e.message)}</p><p>Если planner_get_week отсутствует, сначала требуется отдельная миграция 20261016_schedule_planner.sql. Данные ресторана не заменяются демонстрационными.</p><button id="retryPlanner">Повторить</button>`;root.querySelector('button').onclick=()=>mount(root,preview,week);}
+    }catch(e){if(ticket!==job)return;root.innerHTML=`<h1>Планировщик</h1><p role="alert">${escape(e.message)}</p><p>Если planner_get_week отсутствует, сначала требуется отдельная миграция 20261016_schedule_planner.sql. Данные ресторана не заменяются демонстрационными.</p><button id="retryPlanner">Повторить</button>`;root.querySelector('button').onclick=()=>mount(root,preview,week);}
   }
   window.BK8PlannerUI={mount};
   if(window.openPage){const previous=window.openPage;window.openPage=function(page){if(state?.dirty&&!confirm('В планировщике есть несохранённые изменения. Покинуть редактор?'))return;if(state)state.dirty=false;if(page!=='schedule'){worker?.terminate();worker=null;job++;return previous(page);}document.querySelector('#crumb').textContent='Планировщик расписания';document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='schedule'));return mount(document.querySelector('#content'));};}
