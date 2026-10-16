@@ -28,6 +28,7 @@
     if(state.view==='shifts') body.innerHTML=`<p>Редактирование смены закрепляет её при следующем расчёте. Возможности сотрудников показаны отдельно и не являются назначением.</p><div class="planner-scroll"><table><thead><tr><th>Сотрудник</th><th>День</th><th>Доступность</th><th>Смена</th><th>Позиция</th><th>Закрепить</th><th>Комментарий</th><th></th></tr></thead><tbody>${state.employees.flatMap(e=>P.DAYS.map((d,i)=>{const s=state.shifts.find(x=>String(x.employeeId)===String(e.employee_profile_id)&&x.day===d),role=s?.positions?.[s.start];return `<tr><th>${escape(e.employee_name)}</th><td>${labels[i]}</td><td>${escape(e.availability?.[d]||'Не заполнено')}${e.regular_days_off?.[d]?' · постоянный выходной':''}</td><td><input data-shift="${e.employee_profile_id}/${d}" data-key="interval" value="${s?`${P.clock(s.start)}–${P.clock(s.end)}`:''}" placeholder="09:00–13:00"></td><td><select data-shift="${e.employee_profile_id}/${d}" data-key="role"><option value="">Не назначено</option>${Object.entries(P.ROLES).map(([r,label])=>`<option value="${r}" ${r===role?'selected':''}>${label}</option>`).join('')}</select>${s&&new Set(Object.values(s.positions)).size>1?'<small>Несколько позиций; выбор заменит все</small>':''}</td><td><input type="checkbox" data-shift="${e.employee_profile_id}/${d}" data-key="locked" ${s?.locked?'checked':''}></td><td><input data-shift="${e.employee_profile_id}/${d}" data-key="comment" value="${escape(s?.comment||'')}"></td><td><button data-remove="${e.employee_profile_id}/${d}">Очистить</button></td></tr>`;})).join('')}</tbody></table></div>`;
     if(state.view==='inputs') body.insertAdjacentHTML('beforeend',`<details><summary>Автоматическая погодная поправка</summary><p><a href="https://api.met.no/" target="_blank" rel="noopener">MET Norway</a>, CC BY 4.0. Если прогноз уже учтён аналитиками, отключите автопоправку. Недоступные часы не заполняются выдуманной погодой.</p><label><input type="checkbox" data-config="weatherEnabled" ${c.weatherEnabled?'checked':''}>Применять погодные коэффициенты</label><div class="planner-fields">${Object.entries({rainThreshold:'Осадки от, мм',rainPercent:'Дождь %',coldThreshold:'Холод ниже °C',coldPercent:'Холод %',heatThreshold:'Жара от °C',heatPercent:'Жара %',windThreshold:'Ветер от, м/с',windPercent:'Ветер %'}).map(([key,label])=>`<label>${label} ${field(`weatherRules.${key}`,c.weatherRules[key],'number','step="any"')}</label>`).join('')}</div></details>`);
     if(state.view==='settings')body.insertAdjacentHTML('beforeend',`<p><label>Нормативы настроены до, чеков/час ${field('normMax',c.normMax)}</label></p><p><label><input type="checkbox" data-config="reviewed" ${c.reviewed?'checked':''}>Режим работы и нормативы проверены для моего ресторана</label></p>`);
+    root.querySelectorAll('[data-shift],[data-profile],#plannerBands').forEach(input=>{const key=input.dataset.shift?input.dataset.shift+'/'+input.dataset.key:input.dataset.profile||'bands';if(Object.hasOwn(state.invalidInputs,key))input.value=state.invalidInputs[key];});
     bind();report();
     if(state.stale)setStatus('Возможности изменились. Пересчитайте черновик перед сохранением.',true);
   }
@@ -114,11 +115,13 @@
   }
   async function mount(root,preview=false,week=monday()) {
     worker?.terminate();worker=null;job++;
+    const ticket=job;
     root.innerHTML='<p role="status">Загрузка планировщика…</p>';
     try {
       let loaded;
       if(preview){const employees=Array.from({length:8},(_,i)=>({employee_profile_id:i+1,employee_name:`Сотрудник ${i+1}`,work_type:'FT',availability:Object.fromEntries(P.DAYS.map(d=>[d,'ФТ'])),regular_days_off:{}}));loaded={employees,version:0,sourceHash:'demo',document:null};}
       else loaded=await rpc('planner_get_week',{p_week:week});
+      if(ticket!==job)return;
       state={root,preview,week,employees:loaded.employees,version:loaded.version,sourceHash:loaded.sourceHash,config:loaded.document?.config||P.defaults(),shifts:loaded.document?.shifts||[],stale:!!loaded.savedSourceHash&&loaded.savedSourceHash!==loaded.sourceHash,dirty:false,view:'inputs'};
       state.config.weekStart=week;
       state.invalidInputs={};
