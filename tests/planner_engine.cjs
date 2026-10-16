@@ -28,6 +28,7 @@ const overlap={...locked,day:'tue',start:0,end:500};assert.ok(P.evaluate(config,
 const boundary=structuredClone(config);boundary.profiles.mon=Array(24).fill(0);boundary.profiles.mon[10]=1;boundary.forecasts.mon.checks=20;
 let slot=P.demand(boundary).slots.find(x=>x.day==='mon'&&x.start===600);assert.equal(slot.need.cashier,1);
 boundary.forecasts.mon.checks=21;slot=P.demand(boundary).slots.find(x=>x.day==='mon'&&x.start===600);assert.equal(slot.need.cashier,2);
+boundary.forecasts.mon.checks=200;assert.ok(P.demand(boundary).errors.some(x=>x.includes('выше настроенных нормативов')));
 console.log('Planner engine tests passed');
 const W=require('../docs/control/planner-weather.js');
 assert.equal(W.localHour('2026-10-18T22:00:00Z'),'2026-10-19T01:00');

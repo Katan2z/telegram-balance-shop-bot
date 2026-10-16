@@ -18,7 +18,7 @@
       pt1:[420,960],pt2:[960,1440],weatherPercent:0,weatherEnabled:false,
       weatherRules:{rainThreshold:0.1,rainPercent:0,coldThreshold:0,coldPercent:0,heatThreshold:28,heatPercent:0,windThreshold:10,windPercent:0},
       roles:{kitchen:{enabled:true},cashier:{enabled:true},hall:{enabled:false,start:780,end:1260,count:1},delivery:{enabled:false,start:600,end:1380,count:1},receiving:{enabled:false,start:480,end:1080,count:1,days:['tue','fri']}},
-      bands:[[0,2],[21,3],[31,4],[41,6],[51,8],[61,9],[81,10],[91,11],[101,12],[121,14]],
+      normMax:140,bands:[[0,2],[21,3],[31,4],[41,6],[51,8],[61,9],[81,10],[91,11],[101,12],[121,14]],
       profiles:Object.fromEntries(DAYS.map((d,i)=>[d,Array.from({length:24},(_,h)=>sourceCounts[i][h-6]||0)])),
       forecasts:Object.fromEntries(DAYS.map(d=>[d,{revenue:null,checks:null,averageCheck:null}])),events:[],skills:{},weather:null,actuals:[]};
   }
@@ -55,6 +55,7 @@
     if(!String(c.currency||'').trim()) errors.push('Укажите валюту');
     for(const key of ['pt1','pt2']) if(!Array.isArray(c[key])||!c[key].every(Number.isFinite)||c[key][1]<=c[key][0]) errors.push(`Проверьте ${key}`);
     if(!Array.isArray(c.bands)||!c.bands.length||c.bands[0][0]!==0||c.bands.some((b,i)=>b.length!==2||!b.every(Number.isFinite)||b[1]<0||(i&&b[0]<=c.bands[i-1][0]))) errors.push('Проверьте нормативы чеков');
+    if(!(c.normMax>=0)||!Number.isFinite(c.normMax))errors.push('Укажите максимальную нагрузку, покрытую нормативами');
     if(!Number.isFinite(Number(c.weatherPercent))) errors.push('Проверьте погодную поправку');
     if(c.weatherEnabled&&(!c.weatherRules||Object.values(c.weatherRules).some(x=>!Number.isFinite(x))))errors.push('Проверьте погодные коэффициенты');
     for(const day of DAYS) {
@@ -85,6 +86,7 @@
         if(percent< -100||labor<0){errors.push(`${day} ${clock(t)}: итоговая поправка ниже -100%`);continue;}
         const revenue=Number(f.revenue)*weight*(1+percent/100),volume=checks*weight*(1+percent/100);
         const rate=volume*2,band=[...c.bands].reverse().find(b=>rate>=b[0]);
+        if(trading&&rate>c.normMax){errors.push(`${day} ${clock(t)}: ${rate.toFixed(1)} чеков/час выше настроенных нормативов (${c.normMax}). Дополните нормативы.`);continue;}
         const need={};
         for(const [role,opts] of Object.entries(c.roles)) if(opts.enabled) {
           if(['kitchen','cashier'].includes(role)) need[role]=trading?Math.ceil(Math.round(band[1]*0.5)*labor):1;
@@ -146,7 +148,7 @@
   function generate(c,employees,existing=[]) {
     const result=demand(c);if(result.errors.length)return {...result,shifts:[]};
     const shifts=existing.filter(s=>s.locked).map(s=>JSON.parse(JSON.stringify(s))),issues=[];
-    const stable=[...employees].sort((a,b)=>Number(a.employee_profile_id)-Number(b.employee_profile_id));
+    const stable=[...employees].sort((a,b)=>(c.skills[a.employee_profile_id]?.roles?.length||99)-(c.skills[b.employee_profile_id]?.roles?.length||99)||Number(a.employee_profile_id)-Number(b.employee_profile_id));
     for(const day of DAYS) {
       for(const e of stable) {
         if(shifts.some(s=>s.day===day&&String(s.employeeId)===String(e.employee_profile_id)))continue;

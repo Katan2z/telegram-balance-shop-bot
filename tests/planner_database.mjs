@@ -18,6 +18,8 @@ await db.exec(`set test.jwt='{"app_metadata":{"admin_role":"restaurant_admin","r
 await assert.rejects(db.query("select planner_get_week('2026-10-19')"));
 await db.exec(`set test.jwt='{"app_metadata":{"admin_role":"restaurant_admin","restaurant_key":"bk8"}}';
 insert into employee_profiles values(1,'Тест',123,'active','Член бригады');
+insert into employee_profiles values(2,'Архив',124,'archived','Член бригады'),(3,'Менеджер',125,'active','Менеджер'),(4,'Роль',126,'active','Член бригады');
+insert into managers values(126);
 insert into schedule_weeks(week_start) values('2026-10-19');
 insert into schedule_entries(week_id,employee_profile_id,availability) values(1,1,'{"mon":"9-17"}');`);
 let week=(await db.query("select planner_get_week('2026-10-19') as v")).rows[0].v;
@@ -36,4 +38,9 @@ document={config,shifts:[{...shift,start:0}]};week=(await db.query("select plann
 await save(1,week.sourceHash,document);await assert.rejects(db.query("select planner_publish_week('2026-10-19',2,true)"));
 assert.equal((await db.query('select final_schedule from schedule_entries')).rows[0].final_schedule.mon,'09:00–10:00');
 assert.equal((await db.query('select count(*)::int as n from planner_versions')).rows[0].n,2);
+await db.exec(`update schedule_entries set availability='{"mon":"10-17"}';`);
+await assert.rejects(db.query("select planner_publish_week('2026-10-19',2,true)"));
+await db.exec('set role authenticated');
+await assert.rejects(db.query('select * from planner_weeks'));
+await db.exec('reset role');
 console.log('Planner database tests passed');await db.close();
