@@ -21,7 +21,9 @@ class AdminUsabilityTests(unittest.TestCase):
     def test_remembered_session_uses_refresh_token_and_can_be_cleared(self):
         self.assertIn('id="rememberDevice"', self.index)
         self.assertIn("localStorage", self.app)
-        self.assertIn("grant_type=refresh_token", self.app)
+        client = Path("docs/control/session-client.js").read_text(encoding="utf-8")
+        self.assertIn("grant_type=refresh_token", client)
+        self.assertIn("await window.bk8AccessSession()", self.app)
         self.assertIn("clearAdminSession()", self.app)
 
     def test_task_recipients_support_one_selected_or_all(self):
