@@ -43,3 +43,17 @@ assert.equal(P.historyProposal(history).complete.length,0,'incomplete days canno
 for(let h=8;h<23;h++)history.actuals.push({date:'2026-10-05',hour:h,revenue:100,checks:10});
 assert.equal(P.historyProposal(history).complete[0].days,1);
 console.log('Weather and history tests passed');
+assert.ok(P.weatherSuggestions([],[],config.weatherRules).every(x=>x.percent===null));
+const snapshots=[],facts=[];
+for(let i=0;i<14;i++){
+  const day=new Date('2026-01-05T00:00:00Z');day.setUTCDate(day.getUTCDate()+i*7);const iso=day.toISOString().slice(0,10),rain=i<7;
+  const c=structuredClone(config);c.weekStart=iso;c.capturedAt='2025-12-01T00:00:00Z';
+  c.weather={fetchedAt:'2025-12-01T00:00:00Z',hours:[]};
+  for(let h=8;h<23;h++){c.weather.hours.push({time:`${iso}T${String(h).padStart(2,'0')}:00`,temperature:15,wind:2,precipitation:rain?1:0});facts.push({date:iso,hour:h,revenue:(rain?900:1000)/15,checks:10});}
+  snapshots.push(c);
+}
+let suggestions=P.weatherSuggestions(snapshots,facts,config.weatherRules);
+assert.equal(suggestions[0].exposed,7);assert.equal(suggestions[0].controls,7);assert.ok(Math.abs(suggestions[0].percent+10)<1e-8);
+snapshots.forEach(c=>c.capturedAt='2030-01-01T00:00:00Z');
+assert.ok(P.weatherSuggestions(snapshots,facts,config.weatherRules).every(x=>x.percent===null),'no hindsight forecast training');
+console.log('Weather suggestions tests passed');

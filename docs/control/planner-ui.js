@@ -30,6 +30,7 @@
     if(state.view==='settings')body.insertAdjacentHTML('beforeend',`<p><label>Нормативы настроены до, чеков/час ${field('normMax',c.normMax)}</label></p><p><label><input type="checkbox" data-config="reviewed" ${c.reviewed?'checked':''}>Режим работы и нормативы проверены для моего ресторана</label></p>`);
     if(state.view==='settings')body.insertAdjacentHTML('beforeend',`<label>Дни приёмки <select multiple data-role-days="receiving">${P.DAYS.map((d,i)=>`<option value="${d}" ${c.roles.receiving.days.includes(d)?'selected':''}>${labels[i]}</option>`).join('')}</select></label>`);
     root.querySelectorAll('[data-shift],[data-profile],#plannerBands').forEach(input=>{const key=input.dataset.shift?input.dataset.shift+'/'+input.dataset.key:input.dataset.profile||'bands';if(Object.hasOwn(state.invalidInputs,key))input.value=state.invalidInputs[key];});
+    if(state.view==='inputs')body.insertAdjacentHTML('beforeend','<h2>Погодные коэффициенты по истории</h2><p>Оценка связи продаж с сохранённым прогнозом погоды, не доказательство причины. Нужны минимум 7 полных дней с условием и 7 без него; акции и совмещённые погодные условия исключаются. Настройки не меняются без вашего выбора.</p><button data-action="weatherHistory">Предложить коэффициенты</button><div id="weatherSuggestions"></div>');
     bind();report();
     if(state.stale)setStatus('Возможности изменились. Пересчитайте черновик перед сохранением.',true);
   }
@@ -65,10 +66,17 @@
   async function action(name) {
     if(['generate','save','publish'].includes(name)&&Object.keys(state.invalidInputs).length)throw Error('Исправьте некорректно введённые поля: '+Object.keys(state.invalidInputs).join(', '));
     if(name==='addEvent'){state.config.events.push({day:'mon',title:'',start:720,end:840,percent:0,laborPercent:0,included:false});markDirty();render();return;}
+    if(name==='weatherHistory') {
+      const history=state.preview?{snapshots:[],actuals:[]}:await rpc('planner_weather_history',{});
+      const actuals=new Map(history.actuals.map(x=>[`${x.date}/${x.hour}`,x]));state.config.actuals.forEach(x=>actuals.set(`${x.date}/${x.hour}`,x));
+      const suggestions=P.weatherSuggestions([state.config,...history.snapshots],[...actuals.values()],state.config.weatherRules),names={rainPercent:'Дождь',coldPercent:'Холод',heatPercent:'Жара',windPercent:'Ветер'};
+      const root=document.querySelector('#weatherSuggestions');root.innerHTML=suggestions.map(s=>`<p>${names[s.key]}: ${s.percent===null?'недостаточно данных':`${s.percent.toFixed(1)}%`} · дней с условием ${s.exposed}, без ${s.controls} ${s.percent!==null?`<button data-apply-weather="${s.key}">Применить вручную</button>`:''}</p>`).join('');
+      root.querySelectorAll('[data-apply-weather]').forEach(b=>b.onclick=()=>{const s=suggestions.find(x=>x.key===b.dataset.applyWeather);if(confirm(`Применить оценку ${names[s.key]} ${s.percent.toFixed(1)}%? Это наблюдаемая связь, а не доказанная причинность.`)){state.config.weatherRules[s.key]=Math.round(s.percent*10)/10;markDirty();b.disabled=true;}});return;
+    }
     if(name==='cancel'){worker?.terminate();worker=null;job++;setStatus('Расчёт отменён; предыдущий черновик сохранён в редакторе');return;}
     if(name==='generate') {
       const errors=P.validateConfig(state.config);if(errors.length)throw Error(errors.join('; '));worker?.terminate();const id=++job;
-      worker=new Worker('planner-worker.js?v=20261016-1');setStatus('Расчёт…');
+      worker=new Worker('planner-worker.js?v=20261016-history');setStatus('Расчёт…');
       worker.onmessage=event=>{if(event.data.id!==job)return;worker.terminate();worker=null;if(event.data.error){setStatus(event.data.error,true);return;}const result=event.data.result;if(result.errors.length){setStatus(result.errors.join('; '),true);return;}state.shifts=result.shifts;state.stale=false;state.dirty=true;state.view='shifts';render();setStatus(`Черновик рассчитан. ${result.issues.slice(0,8).join('; ')}`);};
       worker.onerror=e=>{worker?.terminate();worker=null;setStatus(`Ошибка расчёта: ${e.message}`,true);};
       worker.postMessage({id,config:state.config,employees:state.employees,shifts:state.shifts});return;

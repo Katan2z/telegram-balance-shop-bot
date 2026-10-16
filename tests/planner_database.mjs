@@ -12,6 +12,7 @@ create table schedule_weeks(id bigint generated always as identity primary key,w
 create table schedule_entries(id bigint generated always as identity,week_id bigint,employee_profile_id bigint,employee_telegram_id bigint,employee_name text,availability jsonb,final_schedule jsonb,comment text,updated_at timestamptz,unique(week_id,employee_profile_id));`);
 const sql=await readFile('docs/migrations/20261016_schedule_planner.sql','utf8');await db.exec(sql);await db.exec(sql);
 await assert.rejects(db.query("select planner_get_week('2026-10-19')"));
+await assert.rejects(db.query('select planner_weather_history()'));
 await db.exec(`set test.uid='00000000-0000-0000-0000-000000000001';set test.jwt='{}';`);
 await assert.rejects(db.query("select planner_get_week('2026-10-19')"));
 await db.exec(`set test.jwt='{"app_metadata":{"admin_role":"restaurant_admin","restaurant_key":"other"}}';`);
@@ -38,6 +39,7 @@ document={config,shifts:[{...shift,start:0}]};week=(await db.query("select plann
 await save(1,week.sourceHash,document);await assert.rejects(db.query("select planner_publish_week('2026-10-19',2,true)"));
 assert.equal((await db.query('select final_schedule from schedule_entries')).rows[0].final_schedule.mon,'09:00–10:00');
 assert.equal((await db.query('select count(*)::int as n from planner_versions')).rows[0].n,2);
+assert.equal((await db.query('select planner_weather_history() as v')).rows[0].v.snapshots.length,2);
 await db.exec(`update schedule_entries set availability='{"mon":"10-17"}';`);
 await assert.rejects(db.query("select planner_publish_week('2026-10-19',2,true)"));
 await db.exec('set role authenticated');

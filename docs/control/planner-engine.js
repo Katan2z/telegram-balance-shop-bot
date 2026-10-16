@@ -116,6 +116,40 @@
     }
     return {profiles,complete};
   }
+  function weatherSuggestions(snapshots,actuals,rules) {
+    const facts=new Map(actuals.map(x=>[`${x.date}/${x.hour}`,x])),days=new Map();
+    for(const c of snapshots){
+      if(!c.weekStart||!c.weather?.hours||!c.periods||!c.forecasts||!c.profiles)continue;
+      for(let i=0;i<7;i++){
+        const day=DAYS[i],date=new Date(`${c.weekStart}T00:00:00Z`);date.setUTCDate(date.getUTCDate()+i);
+        const iso=date.toISOString().slice(0,10),p=c.periods[day],f=c.forecasts[day];
+        if(days.has(iso)||!(f?.revenue>0)||!p||!Number.isFinite(p.open)||!Number.isFinite(p.close)||p.open<0||p.close>2880||p.close<=p.open||p.open%60||p.close%60||!c.profiles[day]||!Number.isFinite(Date.parse(c.capturedAt))||Date.parse(c.capturedAt)>date.getTime()-3*3600000||!Number.isFinite(Date.parse(c.weather.fetchedAt))||Date.parse(c.weather.fetchedAt)>date.getTime()-3*3600000)continue;
+        if(c.events?.some(e=>e.day===day&&(e.percent||e.laborPercent)))continue;
+        let actual=0,totalWeight=0,valid=true;
+        const exposure={rainPercent:0,coldPercent:0,heatPercent:0,windPercent:0};
+        for(let t=p.open;t<p.close;t+=60){
+          const hourDate=new Date(date);hourDate.setUTCMinutes(t);
+          const key=hourDate.toISOString().slice(0,13)+':00';
+          const fact=facts.get(`${hourDate.toISOString().slice(0,10)}/${hourDate.getUTCHours()}`),w=c.weather.hours.find(x=>x.time===key),weight=c.profiles[day][Math.floor(t/60)%24];
+          if(!fact||!Number.isFinite(fact.revenue)||!w||![w.temperature,w.precipitation,w.wind].every(Number.isFinite)){valid=false;break;}
+          actual+=fact.revenue;totalWeight+=weight;
+          if(w.precipitation>=rules.rainThreshold)exposure.rainPercent+=weight;
+          if(w.temperature<rules.coldThreshold)exposure.coldPercent+=weight;
+          if(w.temperature>=rules.heatThreshold)exposure.heatPercent+=weight;
+          if(w.wind>=rules.windThreshold)exposure.windPercent+=weight;
+        }
+        if(valid&&totalWeight>0)days.set(iso,{residual:actual/f.revenue-1,exposure:Object.fromEntries(Object.entries(exposure).map(([k,v])=>[k,v/totalWeight]))});
+      }
+    }
+    return Object.keys({rainPercent:0,coldPercent:0,heatPercent:0,windPercent:0}).map(key=>{
+      // Exclude combined conditions rather than attributing the same residual twice.
+      const rows=[...days.values()].filter(r=>Object.entries(r.exposure).every(([k,v])=>k===key||v===0));
+      const exposed=rows.filter(r=>r.exposure[key]>0),controls=rows.filter(r=>r.exposure[key]===0);
+      const mean=(arr,fn)=>arr.reduce((s,r)=>s+fn(r),0)/arr.length;
+      const ready=exposed.length>=7&&controls.length>=7;
+      return {key,exposed:exposed.length,controls:controls.length,percent:ready?100*(mean(exposed,r=>r.residual)-mean(controls,r=>r.residual))/mean(exposed,r=>r.exposure[key]):null};
+    });
+  }
   function evaluate(c,employees,shifts,slots=demand(c).slots) {
     const errors=[],warnings=[],coverage=[];let hours=0;
     if(c.weatherEnabled&&slots.some(s=>s.weather?.status!=='По настроенным коэффициентам'))warnings.push('Для части часов нет актуальной погоды; применена только ручная поправка');
@@ -172,6 +206,6 @@
     }
     return {...result,shifts,issues,report:evaluate(c,employees,shifts,result.slots)};
   }
-  root.BK8Planner={DAYS,ROLES,defaults,time,clock,availability,validateConfig,demand,evaluate,generate,weatherEffect,historyProposal};
+  root.BK8Planner={DAYS,ROLES,defaults,time,clock,availability,validateConfig,demand,evaluate,generate,weatherEffect,historyProposal,weatherSuggestions};
   if(typeof module!=='undefined')module.exports=root.BK8Planner;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -167,4 +167,26 @@ end $$;
 
 revoke all on function public.planner_require_admin(),public.planner_source(date),public.planner_get_week(date),public.planner_save_week(date,integer,text,jsonb),public.planner_minutes(text),public.planner_publish_week(date,integer,boolean) from public,anon,authenticated;
 grant execute on function public.planner_get_week(date),public.planner_save_week(date,integer,text,jsonb),public.planner_publish_week(date,integer,boolean) to authenticated;
+
+create or replace function public.planner_weather_history() returns jsonb
+language plpgsql stable security definer set search_path=public as $$
+declare result jsonb;
+begin
+  perform public.planner_require_admin();
+  select jsonb_build_object(
+    'snapshots',coalesce((select jsonb_agg(jsonb_build_object(
+       'weekStart',week_start,'capturedAt',created_at,'periods',document->'config'->'periods','forecasts',document->'config'->'forecasts',
+       'profiles',document->'config'->'profiles','events',document->'config'->'events','weather',document->'config'->'weather'
+     ) order by week_start desc,version) from (select * from public.planner_versions order by week_start desc,version desc limit 120) v),'[]'::jsonb),
+    'actuals',coalesce((select jsonb_agg(value) from (
+      select distinct on (value->>'date',value->>'hour') value
+      from public.planner_weeks pw cross join lateral jsonb_array_elements(coalesce(pw.document->'config'->'actuals','[]'::jsonb))
+      order by value->>'date',value->>'hour',pw.updated_at desc
+    ) facts),'[]'::jsonb)
+  ) into result;
+  return result;
+end $$;
+revoke all on function public.planner_weather_history() from public,anon,authenticated;
+grant execute on function public.planner_weather_history() to authenticated;
+notify pgrst, 'reload schema';
 commit;
