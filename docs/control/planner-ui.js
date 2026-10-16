@@ -34,7 +34,7 @@
     if(state.stale)setStatus('Возможности изменились. Пересчитайте черновик перед сохранением.',true);
   }
   function weatherMarkup() {const w=state.config.weather;if(!w)return '<p>Погода не загружена. Автоматическая поправка не применяется.</p>';const stale=Date.now()-new Date(w.fetchedAt).getTime()>12*3600000;return `<p>${escape(w.provider)} · ${escape(w.fetchedAt)} ${stale?'· УСТАРЕЛО':''}</p><div class="planner-scroll"><table><tr><th>Время</th><th>°C</th><th>Осадки, мм</th><th>Ветер, м/с</th></tr>${(w.hours||[]).filter(x=>x.time.slice(0,10)>=state.week).slice(0,168).map(x=>`<tr><td>${escape(x.time)}</td><td>${x.temperature??'—'}</td><td>${x.precipitation??'—'}</td><td>${x.wind??'—'}</td></tr>`).join('')}</table></div>`;}
-  function markDirty(){state.dirty=true;report();}
+  function markDirty(){state.dirty=true;report();setStatus('Изменения не сохранены');}
   function bind() {
     const root=state.root;
     root.querySelector('#plannerWeek').onchange=async event=>{if(state.dirty&&!confirm('Несохранённые изменения будут потеряны. Перейти?')){event.target.value=state.week;return;}const date=event.target.value;if(!date||new Date(`${date}T12:00:00Z`).getUTCDay()!==1){setStatus('Выберите понедельник',true);return;}await mount(root,state.preview,date);};
@@ -75,7 +75,7 @@
     }
     if(name==='refresh') {
       if(state.preview){setStatus('Демонстрационные возможности уже загружены');return;}
-      const latest=await rpc('planner_get_week',{p_week:state.week});state.stale=latest.sourceHash!==state.sourceHash;state.employees=latest.employees;state.sourceHash=latest.sourceHash;render();setStatus(state.stale?'Возможности изменились. Ручные смены сохранены, нужен пересчёт.':'Возможности актуальны');return;
+      const latest=await rpc('planner_get_week',{p_week:state.week});state.stale=state.stale||latest.sourceHash!==state.sourceHash;state.employees=latest.employees;state.sourceHash=latest.sourceHash;render();setStatus(state.stale?'Возможности изменились. Ручные смены сохранены, нужен пересчёт.':'Возможности актуальны');return;
     }
     if(name==='save'||name==='publish') {
       if(state.preview){setStatus('Предпросмотр: сохранение и публикация в ресторан отключены');return;}
