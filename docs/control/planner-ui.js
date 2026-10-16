@@ -43,9 +43,9 @@
     root.querySelectorAll('[data-training]').forEach(input=>input.onchange=()=>{const s=state.config.skills[input.dataset.training]||={roles:[],training:false};s.training=input.checked;markDirty();});
     root.querySelectorAll('[data-event]').forEach(input=>input.onchange=()=>{const key=input.dataset.key;state.config.events[Number(input.dataset.event)][key]=input.type==='checkbox'?input.checked:['start','end'].includes(key)?P.time(input.value):input.type==='number'?number(input.value):input.value;markDirty();});
     root.querySelectorAll('[data-delete-event]').forEach(b=>b.onclick=()=>{state.config.events.splice(Number(b.dataset.deleteEvent),1);markDirty();render();});
-    root.querySelectorAll('[data-profile],#plannerBands').forEach(input=>input.onchange=()=>{try{const value=JSON.parse(input.value);if(!Array.isArray(value))throw Error('Ожидается массив');if(input.dataset.profile)state.config.profiles[input.dataset.profile]=value;else state.config.bands=value;markDirty();}catch(e){setStatus(`Не сохранено: ${e.message}`,true);}});
+    root.querySelectorAll('[data-profile],#plannerBands').forEach(input=>input.onchange=()=>{const key=input.dataset.profile||'bands';try{const value=JSON.parse(input.value);if(!Array.isArray(value))throw Error('Ожидается массив');if(input.dataset.profile)state.config.profiles[input.dataset.profile]=value;else state.config.bands=value;delete state.invalidInputs[key];markDirty();}catch(e){state.invalidInputs[key]=input.value;state.dirty=true;setStatus(`Не сохранено: ${e.message}. Исправьте поле перед расчётом.`,true);}});
     root.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{state.shifts=state.shifts.filter(s=>`${s.employeeId}/${s.day}`!==b.dataset.remove);markDirty();render();});
-    root.querySelectorAll('[data-shift]').forEach(input=>input.onchange=()=>{try{editShift(input);markDirty();}catch(e){setStatus(e.message,true);}});
+    root.querySelectorAll('[data-shift]').forEach(input=>input.onchange=()=>{const key=input.dataset.shift+'/'+input.dataset.key;try{editShift(input);delete state.invalidInputs[key];markDirty();}catch(e){state.invalidInputs[key]=input.value;state.dirty=true;setStatus(e.message,true);}});
     const actual=root.querySelector('#plannerActuals');if(actual)actual.onchange=()=>previewActuals(actual.files[0]).catch(e=>setStatus(e.message,true));
   }
   function editShift(input) {
@@ -56,8 +56,10 @@
       const role=input.closest('tr').querySelector('[data-key="role"]').value;
       if(!s){s={employeeId:Number(id),day,comment:'',locked:true,positions:{}};state.shifts.push(s);}s.start=start;s.end=end;s.positions=Object.fromEntries(Array.from({length:Math.max(0,Math.ceil((end-start)/30))},(_,i)=>[start+i*30,role]));s.locked=true;
     } else {if(!s)throw Error('Сначала укажите смену');if(key==='role'){s.positions=Object.fromEntries(Object.keys(s.positions).map(t=>[t,input.value]));s.locked=true;}else s[key]=input.type==='checkbox'?input.checked:input.value;}
+    if(s)input.closest('tr').querySelector('[data-key="locked"]').checked=s.locked;
   }
   async function action(name) {
+    if(['generate','save','publish'].includes(name)&&Object.keys(state.invalidInputs).length)throw Error('Исправьте некорректно введённые поля: '+Object.keys(state.invalidInputs).join(', '));
     if(name==='addEvent'){state.config.events.push({day:'mon',title:'',start:720,end:840,percent:0,laborPercent:0,included:false});markDirty();render();return;}
     if(name==='cancel'){worker?.terminate();worker=null;job++;setStatus('Расчёт отменён; предыдущий черновик сохранён в редакторе');return;}
     if(name==='generate') {
@@ -119,6 +121,7 @@
       else loaded=await rpc('planner_get_week',{p_week:week});
       state={root,preview,week,employees:loaded.employees,version:loaded.version,sourceHash:loaded.sourceHash,config:loaded.document?.config||P.defaults(),shifts:loaded.document?.shifts||[],stale:!!loaded.savedSourceHash&&loaded.savedSourceHash!==loaded.sourceHash,dirty:false,view:'inputs'};
       state.config.weekStart=week;
+      state.invalidInputs={};
       state.config.weatherRules||=P.defaults().weatherRules;
       state.config.normMax??=140;
       if(!loaded.document&&loaded.defaults){const fresh=P.defaults();state.config={...fresh,...loaded.defaults,weekStart:week,forecasts:fresh.forecasts,events:[]};}
