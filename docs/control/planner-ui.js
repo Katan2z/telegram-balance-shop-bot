@@ -69,7 +69,7 @@
     if(name==='addEvent'){state.config.events.push({day:'mon',title:'',start:720,end:840,percent:0,laborPercent:0,included:false});markDirty();render();return;}
     if(name==='weatherHistory') {
       const history=state.preview?{snapshots:[],actuals:[]}:await rpc('planner_weather_history',{});
-      if(state!==owner||job!==epoch)return;
+      if(state!==owner||job!==epoch||state.view!=='inputs')return;
       const actuals=new Map(history.actuals.map(x=>[`${x.date}/${x.hour}`,x]));state.config.actuals.forEach(x=>actuals.set(`${x.date}/${x.hour}`,x));
       const suggestions=P.weatherSuggestions([state.config,...history.snapshots],[...actuals.values()],state.config.weatherRules),names={rainPercent:'Дождь',coldPercent:'Холод',heatPercent:'Жара',windPercent:'Ветер'};
       const root=document.querySelector('#weatherSuggestions');root.innerHTML=suggestions.map(s=>`<p>${names[s.key]}: ${s.percent===null?'недостаточно данных':`${s.percent.toFixed(1)}%`} · дней с условием ${s.exposed}, без ${s.controls} ${s.percent!==null?`<button data-apply-weather="${s.key}">Применить вручную</button>`:''}</p>`).join('');
