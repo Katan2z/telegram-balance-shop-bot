@@ -11,11 +11,12 @@
   }
 
   async function api(path, options = {}) {
-    const active = session();
+    let active = await window.bk8AccessSession();
     const config = window.APP_CONFIG || {};
     if (!active?.access_token) throw new Error("Сессия завершена. Войдите снова.");
-    const response = await fetch(`${String(config.SUPABASE_URL).replace(/\/$/, "")}/rest/v1/${path}`, {
+    const send = () => fetch(`${String(config.SUPABASE_URL).replace(/\/$/, "")}/rest/v1/${path}`, {
       ...options,
+      signal: options.signal || AbortSignal.timeout(20000),
       headers: {
         apikey: config.SUPABASE_ANON_KEY,
         Authorization: `Bearer ${active.access_token}`,
@@ -23,8 +24,18 @@
         ...(options.headers || {})
       }
     });
+    let response = await send();
+    if (response.status === 401) {
+      active = await window.bk8AccessSession(true);
+      response = await send();
+    }
     if (response.status === 401) throw new Error("Сессия завершена. Войдите снова.");
-    if (!response.ok) throw new Error(await response.text() || "Не удалось загрузить данные");
+    if (!response.ok) {
+      const body = await response.text();
+      let message = body;
+      try { const details = JSON.parse(body); message = details.message || details.hint || body; } catch (_) {}
+      throw new Error(`Ошибка ${response.status}: ${message || 'Не удалось загрузить данные'}`);
+    }
     if (response.status === 204 || options.headers?.Prefer === "return=minimal") return null;
     return response.json();
   }
@@ -33,15 +44,15 @@
 
   function showLoadError(error) {
     console.error(error);
-    window.showDemo?.("Не удалось загрузить данные");
+    toast(error.message || 'Не удалось загрузить данные');
   }
 
   async function loadOverview() {
     const [profiles, medical, tasks, purchases] = await Promise.all([
       api("employee_profiles?select=id,activation_status,full_name,position,restaurant"),
       api("employee_medical_records?select=employee_profile_id,sanitary_certificate_expires_on,sanitary_minimum_expires_on,fluorography_expires_on"),
-      api("admin_tasks?select=id,completed,due_at"),
-      api("shop_purchases?select=id,status")
+      api("admin_tasks?select=id,title,completed,due_at"),
+      api("shop_purchases?select=id,status,expires_at")
     ]);
     const active = profiles.filter(item => item.activation_status === "active");
     const now = new Date();
@@ -51,9 +62,11 @@
     const openTasks = tasks.filter(item => !item.completed).length;
     if (document.querySelector("#crumb")?.textContent !== "Обзор") return;
     const stats = document.querySelectorAll(".stats .stat");
+    if (stats[1]) { stats[1].querySelector('strong').textContent = '—'; stats[1].querySelector('.trend').textContent = 'Откройте раздел расписания'; }
     if (stats[0]) { stats[0].querySelector("strong").textContent = profiles.length; stats[0].querySelector(".trend").textContent = `${active.length} активны`; }
     if (stats[2]) { stats[2].querySelector("strong").textContent = expiring; stats[2].querySelector(".trend").textContent = "истекают в течение месяца"; }
-    if (stats[3]) { stats[3].querySelector("strong").textContent = openTasks; stats[3].querySelector(".trend").textContent = `${purchases.filter(item => item.status === "pending").length} выдачи ожидают`; }
+    const awaiting = purchases.filter(item => item.status === 'active' && (!item.expires_at || new Date(item.expires_at) > now)).length;
+    if (stats[3]) { stats[3].querySelector("strong").textContent = openTasks; stats[3].querySelector(".trend").textContent = `${awaiting} выдачи ожидают`; }
     const attention = document.querySelector(".grid .panel");
     if (attention) {
       const names = new Map(profiles.map(row => [String(row.id), row.full_name]));
@@ -63,7 +76,7 @@
         if (values.length) alerts.push(["⚕", names.get(String(row.employee_profile_id)) || "Сотрудник", `Документ истекает ${Math.min(...values.map(value => value.getTime())) ? new Date(Math.min(...values.map(value => value.getTime()))).toLocaleDateString("ru-RU") : "скоро"}`, "Документы"]);
       });
       tasks.filter(item => !item.completed && item.due_at && new Date(item.due_at) < new Date(Date.now() + 2 * 86400000)).slice(0, 3).forEach(item => alerts.push(["◆", item.title, `Срок: ${new Date(item.due_at).toLocaleString("ru-RU")}`, "Задача"]));
-      const pending = purchases.filter(item => item.status === "pending").length;
+      const pending = awaiting;
       if (pending) alerts.push(["▣", "Выдача из магазина", `${pending} покупок ожидают подтверждения`, "Магазин"]);
       attention.innerHTML = `<h3>Требует внимания</h3>${alerts.slice(0, 6).map(item => `<div class="alert"><div class="alert-icon">${item[0]}</div><div><strong>${esc(item[1])}</strong><small>${esc(item[2])}</small></div><span class="badge">${esc(item[3])}</span></div>`).join("") || '<div class="empty-live">Срочных событий нет</div>'}`;
     }
@@ -232,4 +245,17 @@
     catch(err){error.textContent=err.message}
     finally{button.disabled=false;button.textContent="Войти в панель"}
   };
+  const menu = document.querySelector('.mobile-menu');
+  if (menu) {
+    menu.setAttribute('aria-label', 'Открыть разделы');
+    menu.onclick = () => {
+      const open = appView.classList.toggle('menu-open');
+      menu.setAttribute('aria-expanded', String(open));
+    };
+    nav.addEventListener('click', event => {
+      if (event.target.closest('button')) { appView.classList.remove('menu-open'); menu.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+  const bell = document.querySelector('.bell');
+  if (bell) { bell.title = 'Уведомления'; bell.onclick = () => window.openPage('notifications'); }
 })();
