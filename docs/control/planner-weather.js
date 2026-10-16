@@ -7,7 +7,10 @@
   function decode(data,now=new Date().toISOString()) {
     if(!Array.isArray(data?.properties?.timeseries))throw Error('Неверный ответ MET Norway');
     return {provider:'MET Norway',source:'https://api.met.no/',license:'CC BY 4.0',fetchedAt:now,modelUpdatedAt:data.properties.meta?.updated_at,
-      latitude:53.9463,longitude:27.6882,timezone:'Europe/Minsk',hours:data.properties.timeseries.map(x=>({time:localHour(x.time),temperature:x.data?.instant?.details?.air_temperature??null,wind:x.data?.instant?.details?.wind_speed??null,precipitation:x.data?.next_1_hours?.details?.precipitation_amount??null}))};
+      latitude:53.9463,longitude:27.6882,timezone:'Europe/Minsk',hours:data.properties.timeseries.map(x=>{
+        const finite=value=>Number.isFinite(value)?value:null;
+        return {time:localHour(x.time),temperature:finite(x.data?.instant?.details?.air_temperature),wind:finite(x.data?.instant?.details?.wind_speed),precipitation:finite(x.data?.next_1_hours?.details?.precipitation_amount)};
+      })};
   }
   async function load() {
     const response=await fetch('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=53.9463&lon=27.6882',{signal:AbortSignal.timeout(15000)});

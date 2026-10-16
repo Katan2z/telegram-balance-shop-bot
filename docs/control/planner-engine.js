@@ -54,7 +54,7 @@
     if(!(Number(c.spmh)>0)) errors.push('Укажите целевой SPMH');
     if(!String(c.currency||'').trim()) errors.push('Укажите валюту');
     for(const key of ['pt1','pt2']) if(!Array.isArray(c[key])||!c[key].every(Number.isFinite)||c[key][1]<=c[key][0]) errors.push(`Проверьте ${key}`);
-    if(!Array.isArray(c.bands)||!c.bands.length||c.bands[0][0]!==0||c.bands.some((b,i)=>b.length!==2||!b.every(Number.isFinite)||b[1]<0||(i&&b[0]<=c.bands[i-1][0]))) errors.push('Проверьте нормативы чеков');
+    if(!Array.isArray(c.bands)||!c.bands.length||!Array.isArray(c.bands[0])||c.bands[0][0]!==0||c.bands.some((b,i)=>!Array.isArray(b)||b.length!==2||!b.every(Number.isFinite)||b[1]<0||(i&&b[0]<=c.bands[i-1][0]))) errors.push('Проверьте нормативы чеков');
     if(!(c.normMax>=0)||!Number.isFinite(c.normMax))errors.push('Укажите максимальную нагрузку, покрытую нормативами');
     if(!Number.isFinite(Number(c.weatherPercent))) errors.push('Проверьте погодную поправку');
     if(c.weatherEnabled&&(!c.weatherRules||Object.values(c.weatherRules).some(x=>!Number.isFinite(x))))errors.push('Проверьте погодные коэффициенты');
