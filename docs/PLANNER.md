@@ -35,6 +35,10 @@ CSV actuals: exact header `date,hour,revenue,checks`, ISO date, integer hour 0�
 
 ## Guided editor (local UX revision)
 
+The admin navigation now separates `schedule` (employee-submitted availability, plus a distinct read-only assigned-shift view) and `schedule-builder` (imports, forecasts, generation, draft save and publication). Availability is the default schedule view and neither its grid nor its Excel export falls back to assigned shifts, or vice versa. Legacy final-shift editing controls are hidden; editing/publishing is done in the builder.
+
+In normal authenticated production mode, changing role presets, individual skills or training status queues a draft save using the existing version-checked planner API. It does not publish a schedule. Save failures stay visible and do not claim persistence. The explicit local read-only mode still uses device-only storage. No new production migration is required for these navigation and draft-persistence changes.
+
 The editor now separates four steps: week inputs, assigned shifts, coverage review, and publication. Employee availability and restaurant settings are secondary views. Revenue forecasts, manually forecast checks, and historical actual sales are explicitly distinct.
 
 The r_keeper importer supports the provided HTML-in-XLS format: seven consecutive Monday–Sunday date columns, each with `Чеков` / `Оплачено`, hour rows, and an `Итого` row. UTF-8 and Windows-1251 are supported. Binary XLS and XLSX are explicitly rejected rather than claimed supported. Parsing runs on the user's device without executing or inserting the uploaded HTML. No uploaded file or real sales data is bundled into the public application or tests.

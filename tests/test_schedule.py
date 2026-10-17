@@ -116,7 +116,8 @@ class ScheduleTests(unittest.TestCase):
         source = (ROOT / "docs" / "control" / "live-sections.js").read_text(encoding="utf-8")
         self.assertIn("renderScheduleEditor(root,normalized,rows)", source)
         self.assertNotIn("JSON.stringify(data,null,2)", source)
-        self.assertIn("entry.final_schedule?.[day[0]]||entry.availability?.[day[0]]", source)
+        self.assertIn("mode==='availability'?entry.availability:entry.final_schedule", source)
+        self.assertNotIn("entry.final_schedule?.[day[0]]||entry.availability?.[day[0]]", source)
 
     def test_admin_panel_has_full_schedule_planner_controls(self):
         source = (ROOT / "docs" / "control" / "live-sections.js").read_text(encoding="utf-8")

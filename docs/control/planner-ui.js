@@ -2,7 +2,7 @@
   'use strict';
   const P=window.BK8Planner,labels=['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
   const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let state=null,worker=null,job=0;
+  let state=null,worker=null,job=0,skillSave=Promise.resolve();
   const number=v=>v===''?null:Number(v);
   const rpc=(name,payload)=>window.bk8Api(`rpc/${name}`,{method:'POST',body:JSON.stringify(payload)});
   function monday() {const now=new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Minsk'}));now.setDate(now.getDate()-(now.getDay()+6)%7+7);return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;}
@@ -99,7 +99,14 @@
     skill.roles=preset==='universal'?Object.keys(P.ROLES).filter(role=>state.config.roles[role]?.enabled):[preset];
   }
   function persistTestSkills(){
-    if(!state.preview&&!state.readOnly)return;
+    if(!state.preview&&!state.readOnly){
+      const owner=state;
+      skillSave=skillSave.catch(()=>{}).then(async()=>{
+        if(state!==owner)return;
+        await action('save');
+      }).catch(error=>{if(state===owner)setStatus('Не удалось сохранить навыки: '+error.message,true);});
+      return;
+    }
     try{window.BK8PlannerSkills.save(localStorage,state.config.skills,state.preview);}
     catch{setStatus('Не удалось запомнить навыки на этом устройстве. Не закрывайте страницу, пока не сохраните результат другим способом.',true);}
   }
@@ -375,7 +382,7 @@
     }catch(e){if(ticket!==job)return;root.innerHTML=`<h1>Не удалось загрузить возможности сотрудников</h1><p role="alert">Проверьте подключение к интернету и вход в панель. Настоящие данные не подменены примером.</p><button id="retryPlanner">Попробовать ещё раз</button><details><summary>Текст ошибки для проверки</summary><p>${escape(e.message)}</p></details>`;root.querySelector('button').onclick=()=>mount(root,preview,week);}
   }
   window.BK8PlannerUI={mount};
-  if(window.openPage){const previous=window.openPage;window.openPage=function(page){if(state?.dirty&&!confirm('В планировщике есть несохранённые изменения. Покинуть редактор?'))return;if(state)state.dirty=false;if(page!=='schedule'){worker?.terminate();worker=null;job++;return previous(page);}document.querySelector('#crumb').textContent='Планировщик расписания';document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='schedule'));return mount(document.querySelector('#content'));};}
-  if(window.enterPanel){const previousEnter=window.enterPanel;window.enterPanel=function(profile){const result=previousEnter(profile);if(location.hash==='#schedule')window.openPage('schedule');return result;};}
+  if(window.openPage){const previous=window.openPage;window.openPage=function(page){if(state?.dirty&&!confirm('В планировщике есть несохранённые изменения. Покинуть редактор?'))return;if(state)state.dirty=false;if(page!=='schedule-builder'){worker?.terminate();worker=null;job++;state=null;return previous(page);}document.querySelector('#crumb').textContent='Составить расписание';document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='schedule-builder'));return mount(document.querySelector('#content'));};}
+  if(window.enterPanel){const previousEnter=window.enterPanel;window.enterPanel=function(profile){const result=previousEnter(profile);if(['#schedule','#schedule-builder'].includes(location.hash))window.openPage(location.hash.slice(1));return result;};}
   window.addEventListener('beforeunload',event=>{if(state?.dirty){event.preventDefault();event.returnValue='';}});
 })();
