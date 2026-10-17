@@ -1,0 +1,30 @@
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const modulePath = process.env.PGLITE_CI === '1' ? '../.audit-runtime/node_modules/@electric-sql/pglite/dist/index.js' : '../.audit-runtime/package/dist/index.js';
+const {PGlite} = await import(modulePath);
+const db = new PGlite();
+await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+create schema auth; create function auth.role() returns text language sql as $$select current_setting('request.jwt.claim.role', true)$$;
+grant usage on schema public, auth to anon, authenticated, service_role;`);
+const sql = await fs.readFile('docs/migrations/20261018_storage_times.sql', 'utf8');
+await db.exec(sql); await db.exec(sql);
+const catalog = {items:[{name:'Сыр', productionHours:4}]};
+const requestId = '00000000-0000-4000-8000-000000000001';
+async function publish(expected, id=requestId, actor=818748106) {
+  return (await db.query('select public.publish_storage_times($1,$2::jsonb,$3,$4,$5,$6) as result', [expected, JSON.stringify(catalog), actor, 'test.xlsx', 'a'.repeat(64), id])).rows[0].result;
+}
+await db.exec(`set request.jwt.claim.role = 'service_role';`);
+await assert.rejects(publish(null, requestId, 123));
+const first = await publish(null);
+assert.equal(first.already_applied, false);
+assert.equal((await publish(null)).revision, first.revision, 'same request must be idempotent');
+await assert.rejects(publish(null, '00000000-0000-4000-8000-000000000002'), /CATALOG_CHANGED/);
+await publish(first.revision, '00000000-0000-4000-8000-000000000002');
+assert.equal((await db.query('select count(*)::int as n from public.storage_time_revisions')).rows[0].n, 2);
+await db.exec('set role anon;');
+assert.equal((await db.query('select count(*)::int as n from public.storage_time_catalog')).rows[0].n, 1);
+await assert.rejects(db.query('delete from public.storage_time_catalog'));
+await assert.rejects(db.query('select * from public.storage_time_revisions'));
+await assert.rejects(publish(null), /permission denied/);
+await db.close();
+console.log('Storage catalog migration, permissions, history and idempotency passed');
