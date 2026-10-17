@@ -12,13 +12,14 @@
   <link rel="stylesheet" href="tasks.css?v=20260909-7">
   <link rel="stylesheet" href="mobile-navigation.css?v=20261016-1">
   <link rel="stylesheet" href="planner.css?v=20261017-split1">
+  <link rel="stylesheet" href="interface.css?v=20261017-1">
 </head>
 <body>
   <section class="login" id="loginView">
     <div class="login-brand"><span>BK8 STAFF</span><h1>CONTROL</h1><p>Управление ресторанами в одном месте</p></div>
     <form class="login-card" id="loginForm">
       <div class="eyebrow">ЗАЩИЩЁННЫЙ ВХОД</div>
-      <h2>Добрый вечер</h2>
+      <h2>Вход в панель BK8</h2>
       <p class="muted">Войдите под своей учётной записью.</p>
       <label>Логин<input id="username" autocomplete="username" required placeholder="Ваш логин"></label>
       <label>Пароль<div class="password"><input type="password" id="password" autocomplete="current-password" required placeholder="Ваш пароль"><button type="button" id="showPassword">Показать</button></div></label>
@@ -40,7 +41,19 @@
       <section class="content" id="content"></section>
     </main>
   </div>
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="panelHelp" class="editor-dialog help-dialog" aria-labelledby="panelHelpTitle">
+    <h2 id="panelHelpTitle">С чего начать</h2>
+    <ol>
+      <li><strong>Сотрудники</strong> — создать карточку, получить код активации или изменить данные.</li>
+      <li><strong>Балансы</strong> — посмотреть спасибки и монеты, выполнить начисление.</li>
+      <li><strong>Расписание</strong> — посмотреть и изменить неделю. <strong>Составить расписание</strong> — открыть планировщик.</li>
+      <li><strong>Документы</strong> — сроки санитарных справок и файлы ПВВ.</li>
+      <li><strong>Магазин</strong> — товары и подтверждение выдачи. <strong>Задачи</strong> и <strong>Уведомления</strong> — работа с чатами.</li>
+    </ol>
+    <p>После изменения нажмите «Сохранить» и дождитесь подтверждения. При ошибке не закрывайте форму — проверьте сообщение и повторите действие.</p>
+    <form method="dialog"><button class="primary">Понятно</button></form>
+  </dialog>
   <script src="../config.js?v=20260907-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="app.js?v=20261017-split1"></script>
@@ -52,5 +65,6 @@
   <script src="planner-keeper.js?v=20261017-keeper1"></script>
   <script src="planner-skills.js?v=20261017-skills1"></script>
   <script src="planner-ui.js?v=20261017-split1"></script>
+  <script src="interface.js?v=20261017-1"></script>
 </body>
 </html>
