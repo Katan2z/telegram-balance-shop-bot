@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),S=require('../docs/control/planner-skills.js');
+const data=new Map(),storage={getItem:key=>data.get(key)||null,setItem:(key,value)=>data.set(key,value)};
+S.save(storage,{'42':{roles:['kitchen','cashier'],training:true}});
+assert.deepEqual(S.restore(storage,{}),{'42':{roles:['kitchen','cashier'],training:true}});
+assert.deepEqual(S.restore(storage,{'43':{roles:['hall'],training:false}})['42'].roles,['kitchen','cashier'],'skills survive opening another week');
+assert.deepEqual(S.restore(storage,{},true),{},'demo and real restaurant preferences are isolated');
+S.save(storage,{'42':{roles:[],training:false}});
+assert.deepEqual(S.restore(storage,{'42':{roles:['kitchen'],training:true}})['42'],{roles:[],training:false},'cleared choices remain cleared');
+S.save(storage,{'42':{roles:['kitchen','bad','kitchen'],training:true,name:'not stored'}});
+assert.deepEqual(S.restore(storage,{}),{'42':{roles:['kitchen'],training:true}});
+assert.deepEqual(S.restore({getItem:()=>'{broken'},{}),{});
+console.log('Planner skill persistence tests passed');

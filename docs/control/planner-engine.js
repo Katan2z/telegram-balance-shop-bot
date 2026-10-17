@@ -2,6 +2,7 @@
 (function (root) {
   'use strict';
   const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+  const MAX_SHIFT_MINUTES = 12 * 60;
   const ROLES = {kitchen:'Кухня',cashier:'Касса / сборка / выдача',hall:'Зал',delivery:'Доставка',receiving:'Приёмка'};
   const sourceCounts = [
     [0,0,0,16,13,25,36,46,39,84,49,58,51,34,41,41,22,0],
@@ -69,8 +70,13 @@
     for(const [role,v] of Object.entries(c.roles||{})) if(!ROLES[role]||(!['kitchen','cashier'].includes(role)&&v.enabled&&(![v.start,v.end,v.count].every(Number.isFinite)||v.end<=v.start||v.count<0))) errors.push(`Проверьте позицию ${role}`);
     return errors;
   }
+  function normWarnings(slots,c){
+    const peaks=new Map();
+    for(const slot of slots)if(slot.normEstimated){const key=slot.day+'/'+Math.floor(slot.start/60);const previous=peaks.get(key);if(!previous||slot.checks>previous.checks)peaks.set(key,slot);}
+    return [...peaks.values()].map(slot=>`${slot.day} ${clock(Math.floor(slot.start/60)*60)}: прогноз ${(slot.checks*2).toFixed(1)} чеков/час выше проверенного норматива (${c.normMax}). Расписание составлено по последнему известному нормативу; на пике людей может понадобиться больше.`);
+  }
   function demand(c) {
-    const errors=validateConfig(c);if(errors.length) return {errors,slots:[]};
+    const errors=validateConfig(c);if(errors.length) return {errors,warnings:[],slots:[]};
     const slots=[];
     for(const day of DAYS) {
       const p=c.periods[day],f=c.forecasts[day],checks=f.checks!==null&&f.checks!==''?Number(f.checks):Number(f.revenue)/Number(f.averageCheck);
@@ -85,17 +91,17 @@
         const labor=1+events.reduce((s,e)=>s+e.laborPercent,0)/100;
         if(percent< -100||labor<0){errors.push(`${day} ${clock(t)}: итоговая поправка ниже -100%`);continue;}
         const revenue=Number(f.revenue)*weight*(1+percent/100),volume=checks*weight*(1+percent/100);
-        const rate=volume*2,band=[...c.bands].reverse().find(b=>rate>=b[0]);
-        if(trading&&rate>c.normMax){errors.push(`${day} ${clock(t)}: ${rate.toFixed(1)} чеков/час выше настроенных нормативов (${c.normMax}). Дополните нормативы.`);continue;}
+        const rate=volume*2,normEstimated=trading&&rate>c.normMax;
+        const band=[...c.bands].reverse().find(b=>Math.min(rate,c.normMax)>=b[0]);
         const need={};
         for(const [role,opts] of Object.entries(c.roles)) if(opts.enabled) {
           if(['kitchen','cashier'].includes(role)) need[role]=trading?Math.ceil(Math.round(band[1]*0.5)*labor):1;
           else need[role]=t>=opts.start&&t<opts.end&&(!opts.days||opts.days.includes(day))?Math.ceil(opts.count*labor):0;
         }
-        slots.push({day,start:t,end:t+30,baseRevenue:Number(f.revenue)*weight,revenue,checks:volume,source,percent,weather,need});
+        slots.push({day,start:t,end:t+30,baseRevenue:Number(f.revenue)*weight,revenue,checks:volume,source,percent,weather,need,normEstimated});
       }
     }
-    return {errors,slots};
+    return {errors,warnings:normWarnings(slots,c),slots};
   }
   function weatherEffect(c,day,t) {
     if(!c.weatherEnabled)return {percent:0,status:'Отключена'};
@@ -151,13 +157,14 @@
     });
   }
   function evaluate(c,employees,shifts,slots=demand(c).slots) {
-    const errors=[],warnings=[],coverage=[];let hours=0;
+    const errors=[],warnings=normWarnings(slots,c),coverage=[];let hours=0;
     if(c.weatherEnabled&&slots.some(s=>s.weather?.status!=='По настроенным коэффициентам'))warnings.push('Для части часов нет актуальной погоды; применена только ручная поправка');
     const seen=new Set(),byId=new Map(employees.map(e=>[String(e.employee_profile_id),e]));
     for(const s of shifts) {
       const key=`${s.employeeId}/${s.day}`,e=byId.get(String(s.employeeId)),a=e&&DAYS.includes(s.day)?availability(e,s.day,c):null;
       if(seen.has(key)) errors.push(`${key}: несколько смен за день`);seen.add(key);
       if(!a||a.error||a.off||!Number.isFinite(s.start)||!Number.isFinite(s.end)||s.start%30||s.end%30||s.start<a.start||s.end>a.end||s.end<=s.start) errors.push(`${key}: смена вне доступности`);
+      if(s.end-s.start>MAX_SHIFT_MINUTES)errors.push(`${key}: смена длиннее 12 часов — сократите её`);
       const skill=c.skills[String(s.employeeId)];
       if(!skill?.roles?.length) errors.push(`${key}: не заданы навыки`);
       for(let t=s.start;t<s.end;t+=30) if(!skill?.roles?.includes(s.positions?.[t])||!c.roles[s.positions?.[t]]?.enabled) {errors.push(`${key} ${clock(t)}: недопустимая позиция`);break;}
@@ -172,7 +179,7 @@
     }
     for(const slot of slots) for(const [role,needed] of Object.entries(slot.need)) {
       const assigned=shifts.filter(s=>s.day===slot.day&&s.start<=slot.start&&s.end>slot.start&&s.positions?.[slot.start]===role).length;
-      coverage.push({day:slot.day,start:slot.start,role,needed,assigned,missing:Math.max(0,needed-assigned),excess:Math.max(0,assigned-needed)});
+      coverage.push({day:slot.day,start:slot.start,role,needed,assigned,missing:Math.max(0,needed-assigned),excess:Math.max(0,assigned-needed),normEstimated:!!slot.normEstimated});
     }
     const revenue=slots.reduce((s,x)=>s+x.revenue,0),checks=slots.reduce((s,x)=>s+x.checks,0),spmh=hours?revenue/hours:null;
     if(coverage.some(x=>x.missing))warnings.push('Есть непокрытая потребность');
@@ -182,6 +189,8 @@
   function generate(c,employees,existing=[]) {
     const result=demand(c);if(result.errors.length)return {...result,shifts:[]};
     const shifts=existing.filter(s=>s.locked).map(s=>JSON.parse(JSON.stringify(s))),issues=[];
+    const tooLong=shifts.filter(s=>s.end-s.start>MAX_SHIFT_MINUTES);
+    if(tooLong.length)return {...result,shifts,issues,errors:tooLong.map(s=>`${s.employeeId}/${s.day}: закреплена смена длиннее 12 часов — исправьте её перед расчётом`)};
     const stable=[...employees].sort((a,b)=>(c.skills[a.employee_profile_id]?.roles?.length||99)-(c.skills[b.employee_profile_id]?.roles?.length||99)||Number(a.employee_profile_id)-Number(b.employee_profile_id));
     for(const day of DAYS) {
       for(const e of stable) {
@@ -197,7 +206,15 @@
           if(ranked.length){positions[slot.start]=ranked[0].role;previous=ranked[0].role;}
         }
         const times=Object.keys(positions).map(Number).sort((a,b)=>a-b);if(!times.length)continue;
-        const start=times[0],end=times[times.length-1]+30;
+        // Choose the best continuous window, never a full FT availability span.
+        const candidates=times.map(start=>{
+          const covered=times.filter(t=>t>=start&&t<start+MAX_SHIFT_MINUTES),end=covered[covered.length-1]+30;
+          const overlaps=shifts.some(s=>String(s.employeeId)===String(e.employee_profile_id)&&DAYS.indexOf(s.day)*1440+s.start<DAYS.indexOf(day)*1440+end&&DAYS.indexOf(day)*1440+start<DAYS.indexOf(s.day)*1440+s.end);
+          return {start,end,score:covered.length,overlaps};
+        }).filter(window=>!window.overlaps).sort((a,b)=>b.score-a.score||(a.end-a.start)-(b.end-b.start)||a.start-b.start);
+        if(!candidates.length){issues.push(`${e.employee_name}: пересечение с соседним днём`);continue;}
+        const {start,end}=candidates[0];
+        Object.keys(positions).forEach(t=>{if(Number(t)<start||Number(t)>=end)delete positions[t];});
         for(let t=start;t<end;t+=30)if(!positions[t])positions[t]=positions[t-30]||positions[start];
         const shift={employeeId:e.employee_profile_id,day,start,end,positions,locked:false,comment:''};
         const overlaps=shifts.some(s=>String(s.employeeId)===String(shift.employeeId)&&DAYS.indexOf(s.day)*1440+s.start<DAYS.indexOf(day)*1440+end&&DAYS.indexOf(day)*1440+start<DAYS.indexOf(s.day)*1440+s.end);
@@ -206,6 +223,6 @@
     }
     return {...result,shifts,issues,report:evaluate(c,employees,shifts,result.slots)};
   }
-  root.BK8Planner={DAYS,ROLES,defaults,time,clock,availability,validateConfig,demand,evaluate,generate,weatherEffect,historyProposal,weatherSuggestions};
+  root.BK8Planner={DAYS,ROLES,MAX_SHIFT_MINUTES,defaults,time,clock,availability,validateConfig,demand,evaluate,generate,weatherEffect,historyProposal,weatherSuggestions};
   if(typeof module!=='undefined')module.exports=root.BK8Planner;
 })(typeof globalThis!=='undefined'?globalThis:this);
