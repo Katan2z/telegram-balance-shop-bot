@@ -81,7 +81,9 @@ async def storage_document(message, bot):
         await message.answer_document(BufferedInputFile(report.encode('utf-8'), filename='storage-changes.txt'),
                                       caption='Полный список изменений и примечаний. Данные пока не изменены.')
         summary = f"Прочитано продуктов: {len(parsed['items'])}.\nНовых/изменённых: {len(changes)}.\nСохранено вне файла: {retained}.\n"
-        summary += '\n'.join(parsed['warnings'])
+        summary += '\n'.join(parsed['warnings'][:5])
+        if len(parsed['warnings']) > 5:
+            summary += '\nОстальные примечания — в приложенном списке.'
         summary += '\n\nПроверь приложенный список. Применить эту версию? Подтверждение действует 15 минут.'
         keyboard = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text='✅ Применить', callback_data=f'sl_apply:{token}'),

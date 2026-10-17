@@ -69,6 +69,8 @@ def parse_storage(path):
             if production.casefold() == 'маркировка':
                 continue  # Section header, not a product.
             try:
+                if any(len(value) > 3000 for value in values):
+                    raise ValueError('Слишком длинное значение в ячейке.')
                 if any(cell.data_type == 'f' for cell in cells):
                     raise ValueError('Формулы не поддерживаются. Пришлите таблицу со значениями.')
                 if name_key(name) in seen:
@@ -105,6 +107,8 @@ def parse_storage(path):
             raise ValueError('\n'.join(errors[:15]))
         if not rows:
             raise ValueError('В файле не найдены продукты.')
+        if len(rows) > 2000:
+            raise ValueError('В каталоге допустимо не более 2000 продуктов.')
         return {'items': rows, 'warnings': warnings, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
     finally:
         workbook.close()
