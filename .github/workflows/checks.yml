@@ -22,6 +22,7 @@ jobs:
       - run: node tests/section_lifecycle.cjs
       - run: node tests/navigation_observer.cjs
       - run: node tests/admin_session.cjs
+      - run: node tests/admin_writes.cjs
       - run: node tests/storage_catalog_client.cjs
       - run: node tests/planner_engine.cjs
       - run: node tests/planner_async.cjs
