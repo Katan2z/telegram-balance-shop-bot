@@ -1,0 +1,71 @@
+/* Shared admin interface: layout, controls and responsive navigation. */
+:root {--muted:#716258;--line:#e6ded3;--paper:#fffefa;background:#f7f5f0}
+body {font-size:15px;line-height:1.5}
+button,a,input,select,textarea {touch-action:manipulation}
+button {transition:background .15s,border-color .15s;min-height:42px}
+button:focus-visible,a:focus-visible {outline:3px solid #bd7b13;outline-offset:3px}
+input:focus,select:focus,textarea:focus {border-color:#aa701e;box-shadow:0 0 0 3px #ffca4333}
+button:disabled {opacity:.55;cursor:wait;transform:none!important}
+.app {grid-template-columns:242px minmax(0,1fr)}
+.app>main {min-width:0}
+aside {padding:24px 14px;background:#382018}
+.logo {padding:0 14px 20px}.logo strong {font-size:23px;letter-spacing:0}
+nav {gap:4px;padding:18px 0}.nav-item {padding:10px 12px;font-size:14px;border-radius:9px;min-height:44px}
+.nav-item span {width:23px;text-align:center;flex-shrink:0}
+.nav-item.active {background:#ffca43;color:#352016;font-weight:800}
+.nav-item:not(.active):hover {background:#ffffff12}
+.account {padding-top:16px;font-size:12px}.account small {line-height:1.4}
+header {height:72px;background:#fffefa;border-bottom:1px solid var(--line);padding:0 30px;gap:12px}
+.crumb {font-size:16px;font-weight:750}.header-actions {gap:10px}
+.restaurant-picker {margin:0;font-size:12px}.restaurant-picker select {max-width:180px}
+.content {padding:28px 30px 64px;max-width:1540px}
+.page-head {align-items:center;gap:18px;margin-bottom:22px;flex-wrap:wrap}
+.page-head h1 {font-size:28px;line-height:1.2;letter-spacing:-.035em;margin-bottom:8px}
+.page-head p {font-size:14px;max-width:65ch}
+.panel,.stat {border-radius:14px;box-shadow:none}.panel {padding:22px}
+.panel h3 {font-size:17px}.stats {gap:14px}.stat {padding:18px}.stat strong {font-size:29px;margin:6px 0}
+.grid {gap:18px}.alert {gap:10px;padding:14px 0}.alert-icon {background:#f6eee1;color:#61472a}
+.primary {background:#4a281c;border:1px solid #4a281c;border-radius:9px;padding:11px 18px;box-shadow:none}
+.primary:hover {background:#643b29}.primary.compact,.page-head .primary {width:auto;margin:0}
+.secondary {border-radius:9px;padding:9px 14px;background:#fffefa}
+.secondary:hover {background:#fff3d7;border-color:#c2aa81}
+.quick {grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.quick button {padding:14px;border-radius:10px;background:#faf7ef;transform:none!important}
+label {margin:18px 0 7px;font-size:13px}
+input,select,textarea {font:inherit;border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:#fff;max-width:100%;line-height:1.4}
+textarea {min-height:92px;resize:vertical;width:100%}
+input[type=checkbox],input[type=radio] {width:20px;height:20px;accent-color:#6b441d}
+.section-toolbar,.employee-tools {gap:12px;flex-wrap:wrap}
+.live-table-wrap {overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:10px}
+th {background:#f7f3eb;font-size:11px;letter-spacing:.04em;white-space:nowrap;color:#6e5b4e}
+td {font-size:14px;padding:13px 12px;vertical-align:middle}tbody tr:hover {background:#fff9eb}
+td small {display:block;color:var(--muted);margin-top:3px}
+.row-actions {display:flex;gap:8px;flex-wrap:wrap}.danger-action {color:#ac271d;border-color:#e4b9b3}
+.status,.badge {font-size:12px;font-weight:650;padding:4px 9px}
+.editor-dialog {width:min(620px,calc(100vw - 28px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 24px 80px #24120833}
+dialog::backdrop {background:#26180f66;backdrop-filter:blur(2px)}
+.compose-head {gap:16px;align-items:flex-start}.compose-head h2 {font-size:22px;margin:4px 0}
+.login-card {border-radius:18px;box-shadow:0 16px 50px #35170e0c}.login-card h2 {font-size:29px}
+.login-brand h1 {letter-spacing:-.05em}.login-error {color:#a52b20;overflow-wrap:anywhere}
+.toast {z-index:1000;max-width:min(580px,calc(100vw - 32px));white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.help-dialog h2 {margin-top:0}.help-dialog li {margin-bottom:12px}.help-dialog p {color:var(--muted)}
+@media(max-width:1050px) and (min-width:601px) {
+  .app {grid-template-columns:205px minmax(0,1fr)}
+  .nav-item {font-size:13px;justify-content:flex-start}.nav-item span {font-size:18px}
+  .logo strong {font-size:23px}.logo strong:after {content:none}.logo span {display:block}
+  .account div:nth-child(2),.account button {display:block}
+  .content {padding:22px 20px 48px}.grid {grid-template-columns:1fr}
+}
+@media(max-width:600px) {
+  .app {display:block}header {padding:0 14px;height:64px}.content {padding:20px 14px 48px}
+  .page-head h1 {font-size:25px}.page-head {align-items:flex-start;gap:14px}
+  .page-head .compact {font-size:14px}.page-head .compact::after {content:none}
+  .page-head>.primary,.page-head>.secondary {width:100%}
+  .panel {padding:16px}.stats {grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .stat {padding:13px}.stat strong {font-size:25px}.quick {grid-template-columns:1fr}
+  .restaurant-picker {display:none!important}.header-actions {gap:6px}
+  .editor-dialog {padding:18px}.section-toolbar>* {max-width:100%}
+  .app.menu-open aside {width:min(290px,85vw);top:64px;box-shadow:10px 0 40px #20100844}
+  .toast {left:16px;right:16px;bottom:16px}
+}
+@media(prefers-reduced-motion:reduce) {* {scroll-behavior:auto!important;transition:none!important}}
