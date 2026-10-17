@@ -63,8 +63,8 @@ async def alert_command(message, command: CommandObject):
             del pending[next(iter(pending))]
         token = secrets.token_hex(8)
         pending[token] = {'owner': owner, 'chat': message.chat.id, 'rows': rows, 'expires': now + 600}
-        buttons = [[InlineKeyboardButton(text=f"{row['title'][:65]} · стр. {row['page'] + 1}", callback_data=f'al:{token}:{index}')] for index, row in enumerate(rows)]
-        await message.answer('Выбери страницу (до 10 наиболее подходящих). Если нужной нет — уточни запрос.', reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        buttons = [[InlineKeyboardButton(text=f"{row.get('category') or row['title'][:45]} · стр. {row['page'] + 1} · {row['title'][:30]}", callback_data=f'al:{token}:{index}')] for index, row in enumerate(rows)]
+        await message.answer('Сначала — хранение, температура и подготовка продукта, затем остальные совпадения. Выбери страницу или уточни запрос.', reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
     except (ValueError, FileNotFoundError) as error:
         await message.answer(html.escape(str(error)))
     except Exception:

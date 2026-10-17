@@ -38,6 +38,17 @@ class StandardsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             search('???', root=self.root)
 
+    def test_product_storage_ranks_above_frequent_recipe_mentions(self):
+        with closing(sqlite3.connect(self.root / 'index.sqlite')) as db, db:
+            db.executemany('INSERT INTO pages VALUES (?,?,?,?)', [
+                ('Позиции в меню.pdf', 2, 'Томаты', normalize('томаты ' * 50 + ' сборка бургера температура')),
+                ('Приготовление ингредиентов.pdf', 7, 'Продукт', normalize('Томаты срок хранения температура')),
+            ])
+        results = search('томаты', root=self.root)
+        self.assertEqual(results[0]['page'], 7)
+        self.assertEqual(results[0]['category'], 'Хранение/температура')
+        self.assertEqual(search('помидоры', root=self.root)[0]['page'], 7)
+
     def test_render_and_traversal(self):
         with closing(pdfium.PdfDocument.new()) as doc:
             page = doc.new_page(600, 800)
