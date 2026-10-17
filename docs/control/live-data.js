@@ -36,8 +36,15 @@
       try { const details = JSON.parse(body); message = details.message || details.hint || body; } catch (_) {}
       throw new Error(`Ошибка ${response.status}: ${message || 'Не удалось загрузить данные'}`);
     }
-    if (response.status === 204 || options.headers?.Prefer === "return=minimal") return null;
-    return response.json();
+    if (response.status === 204 || options.headers?.Prefer === "return=minimal") {
+      if(options.requireRows) throw new Error('База не подтвердила изменение записи. Проверьте права доступа.');
+      return null;
+    }
+    const result = await response.json();
+    if (options.requireRows && (!Array.isArray(result) || !result.length)) {
+      throw new Error('Изменение не сохранено: запись недоступна, удалена или изменена другим администратором. Обновите раздел и проверьте права доступа.');
+    }
+    return result;
   }
   window.bk8Api = api;
   window.bk8Session = session;
@@ -157,6 +164,16 @@
     const list = document.querySelector(".task-list");
     list.querySelectorAll(".task-row").forEach(node => node.remove());
     list.insertAdjacentHTML("beforeend", tasks.map(task => taskRow(task, names)).join("") || '<div class="empty-live">Задач пока нет</div>');
+    const filter = document.createElement('select');
+    filter.setAttribute('aria-label','Какие задачи показать');
+    filter.innerHTML='<option value="open">В работе</option><option value="done">Завершённые</option><option value="all">Все задачи</option>';
+    list.prepend(filter);
+    const taskRows=[...list.querySelectorAll('.task-row')];
+    taskRows.forEach((row,index)=>{
+      if(!tasks[index].completed) row.querySelector('.task-row-actions').insertAdjacentHTML('beforeend',`<button class="dots" data-task-delete="${Number(tasks[index].id)}" title="Удалить неактуальную задачу">×</button>`);
+    });
+    filter.onchange=()=>taskRows.forEach((row,index)=>{row.hidden=filter.value==='open'?Boolean(tasks[index].completed):filter.value==='done'?!tasks[index].completed:false;});
+    filter.onchange();
     const chat = document.querySelector("#taskChat");
     chat.innerHTML = '<option value="">Выберите чат</option>' + chats.map(row => `<option value="${Number(row.chat_id)}">${esc(row.title)}</option>`).join("");
     document.querySelector("#chatNote").textContent = `Бот видит ${chats.length} чата`;
@@ -208,9 +225,9 @@
       const form=document.querySelector("#taskForm");form.dataset.editId=task.id;audience.value="one";drawAudience();document.querySelector("#taskTitle").value=task.title||"";document.querySelector("#taskDescription").value=task.description||"";document.querySelector("#taskAssignee").value=String(task.assigned_to||"");document.querySelector("#taskChat").value=String(task.notification_chat_id||"");document.querySelector("#taskPriority").value=task.priority||"normal";if(task.due_at){const due=new Date(task.due_at);due.setMinutes(due.getMinutes()-due.getTimezoneOffset());document.querySelector("#taskDue").value=due.toISOString().slice(0,16)}form.querySelector('[type="submit"]').textContent="Сохранить изменения";document.querySelector("#taskCompose").classList.add("visible");
     });
     list.querySelectorAll("[data-task-delete]").forEach(button => button.onclick = async () => {
-      if (!confirm("Удалить выполненную задачу?")) return;
+      if (!confirm("Удалить эту задачу? Она исчезнет из панели. Уже отправленное сообщение в Telegram останется.")) return;
       try {
-        await api(`admin_tasks?id=eq.${Number(button.dataset.taskDelete)}&completed=eq.true`, {method:"DELETE",headers:{Prefer:"return=minimal"}});
+        await api(`admin_tasks?id=eq.${Number(button.dataset.taskDelete)}`, {method:"DELETE",requireRows:true,headers:{Prefer:"return=representation"}});
         toast("Задача удалена"); originalTasks(); await loadTasks();
       } catch(error) { toast(error.message); }
     });
