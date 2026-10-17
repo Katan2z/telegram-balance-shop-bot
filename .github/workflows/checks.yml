@@ -24,6 +24,12 @@ jobs:
       - run: node tests/admin_session.cjs
       - run: node tests/planner_engine.cjs
       - run: node tests/planner_async.cjs
+      - run: node tests/planner_roster.cjs
+      - run: node tests/planner_workflow.cjs
+      - run: node tests/planner_keeper.cjs
+      - run: node tests/planner_autofill.cjs
+      - run: node tests/planner_skills.cjs
+      - run: node tests/planner_routes.cjs
       - run: npm install --prefix .audit-runtime --no-save --ignore-scripts @electric-sql/pglite@0.3.14
       - run: node tests/planner_database.mjs
         env:

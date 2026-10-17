@@ -11,6 +11,7 @@ create table schedule_preferences(employee_profile_id bigint,work_type text,regu
 create table schedule_weeks(id bigint generated always as identity primary key,week_start date unique,submission_deadline timestamptz,status text,published_at timestamptz,updated_at timestamptz);
 create table schedule_entries(id bigint generated always as identity,week_id bigint,employee_profile_id bigint,employee_telegram_id bigint,employee_name text,availability jsonb,final_schedule jsonb,comment text,updated_at timestamptz,unique(week_id,employee_profile_id));`);
 const sql=await readFile('docs/migrations/20261016_schedule_planner.sql','utf8');await db.exec(sql);await db.exec(sql);
+const limitSql=await readFile('docs/migrations/20261017_planner_max_shift.sql','utf8');await db.exec(limitSql);await db.exec(limitSql);
 await assert.rejects(db.query("select planner_get_week('2026-10-19')"));
 await assert.rejects(db.query('select planner_weather_history()'));
 await db.exec(`set test.uid='00000000-0000-0000-0000-000000000001';set test.jwt='{}';`);
@@ -45,4 +46,14 @@ await assert.rejects(db.query("select planner_publish_week('2026-10-19',2,true)"
 await db.exec('set role authenticated');
 await assert.rejects(db.query('select * from planner_weeks'));
 await db.exec('reset role');
+await db.exec(`update schedule_entries set availability='{"mon":"0-24"}';`);
+week=(await db.query("select planner_get_week('2026-10-19') as v")).rows[0].v;
+const wideConfig={...config,periods:{mon:{open:0,close:1440,prep:0,cleanup:0}}};
+const longShift={...shift,start:0,end:750,positions:Object.fromEntries(Array.from({length:25},(_,i)=>[i*30,'kitchen']))};
+await save(2,week.sourceHash,{config:wideConfig,shifts:[longShift]});
+await assert.rejects(db.query("select planner_publish_week('2026-10-19',3,true)"),/12 часов/);
+assert.equal((await db.query('select final_schedule from schedule_entries')).rows[0].final_schedule.mon,'09:00–10:00','failed publication rolls back assigned shifts');
+await save(3,week.sourceHash,{config:wideConfig,shifts:[{...longShift,end:720,positions:Object.fromEntries(Array.from({length:24},(_,i)=>[i*30,'kitchen']))}]});
+await db.query("select planner_publish_week('2026-10-19',4,true)");
+assert.equal((await db.query('select final_schedule from schedule_entries')).rows[0].final_schedule.mon,'00:00–12:00');
 console.log('Planner database tests passed');await db.close();
