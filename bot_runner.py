@@ -111,7 +111,8 @@ async def timesheet_confirm(callback: CallbackQuery):
 
 
 async def main():
-    await app.run_bot((priority_router,))
+    from standards_bot import router as standards_router
+    await app.run_bot((standards_router, priority_router))
 
 
 if __name__ == "__main__":

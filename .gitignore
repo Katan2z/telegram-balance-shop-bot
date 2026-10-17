@@ -4,3 +4,5 @@ __pycache__/
 .env
 .pytest_cache/
 .audit-runtime/
+.standards/
+.ops-download/
