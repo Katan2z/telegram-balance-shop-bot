@@ -35,6 +35,9 @@ jobs:
       - run: node tests/planner_database.mjs
         env:
           PGLITE_CI: '1'
+      - run: node tests/admin_balance_database.mjs
+        env:
+          PGLITE_CI: '1'
       - run: node tests/storage_catalog_database.mjs
         env:
           PGLITE_CI: '1'

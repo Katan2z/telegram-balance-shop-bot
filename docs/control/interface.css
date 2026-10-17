@@ -1,6 +1,7 @@
 /* Shared admin interface: layout, controls and responsive navigation. */
 :root {--muted:#716258;--line:#e6ded3;--paper:#fffefa;background:#f7f5f0}
 body {font-size:15px;line-height:1.5}
+[hidden] {display:none!important}
 button,a,input,select,textarea {touch-action:manipulation}
 button {transition:background .15s,border-color .15s;min-height:42px}
 button:focus-visible,a:focus-visible {outline:3px solid #bd7b13;outline-offset:3px}

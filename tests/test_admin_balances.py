@@ -13,9 +13,11 @@ class AdminBalancePanelTests(unittest.TestCase):
         self.assertIn("const routes={documents,klokr,balances", self.sections)
 
     def test_spasibki_changes_are_written_to_the_transaction_ledger(self):
-        self.assertIn('type:"balance_change"', self.sections)
-        self.assertIn('comment:`АП: ${comment}`', self.sections)
-        self.assertIn("admin_id:actorId()", self.sections)
+        sql = Path('docs/migrations/20261018_admin_balance_adjust.sql').read_text(encoding='utf-8')
+        self.assertIn('rpc/admin_adjust_balance', self.sections)
+        self.assertIn("'balance_change'", sql)
+        self.assertIn('auth.uid()', sql)
+        self.assertIn('for update', sql)
 
     def test_negative_balances_are_rejected_before_write(self):
         self.assertIn("current+delta<0", self.sections)
