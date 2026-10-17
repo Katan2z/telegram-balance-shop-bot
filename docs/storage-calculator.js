@@ -92,7 +92,7 @@ function storageModesForItem(item) {
       });
     }
   } else {
-    const movedHours = storageParseHours(item.prepRaw) || item.prepHours;
+    const movedHours = item.prepHours || storageParseHours(item.prepRaw);
     if (movedHours) {
       modes.push({
         id: "moved",
@@ -104,7 +104,7 @@ function storageModesForItem(item) {
         place: storageModeLabel(item.storageRaw, item.prepPlace),
       });
     }
-    const openedHours = storageParseHours(item.prepLabel);
+    const openedHours = item.openedHours || storageParseHours(item.prepLabel);
     if (openedHours) {
       modes.push({
         id: "opened",
@@ -116,6 +116,15 @@ function storageModesForItem(item) {
         place: storageModeLabel(item.prepPlace, "—"),
       });
     }
+  }
+  if (Array.isArray(item.productionVariants)) {
+    item.productionVariants.forEach((variant, index) => {
+      if (!variant.hours) return;
+      modes.push({id: `production-${index}`, title: item.productionVariants.length > 1 ? `Производство / условие ${index+1}` : 'Производство / на борту',
+        badge: 'ТД', hours: variant.hours, temperingHours: storageTemperingHours(variant.label),
+        label: variant.label, place: storageModeLabel(item.productionPlace, '—')});
+    });
+    return modes;
   }
   const productionHours = storageParseHours(item.productionLabel) || item.productionHours;
   if (productionHours) {
@@ -192,6 +201,7 @@ function storageBuildCalculator() {
       <section class="tab-page" id="tab-storage">
         <article class="card storage-panel">
           <h2>⏱️ Калькулятор сроков</h2>
+          <p id="storageCatalogStatus" role="status"></p>
           <div class="admin-form storage-form">
             <label>Поиск продукта</label>
             <input id="storageSearch" type="text" placeholder="Например: булочки" />
@@ -226,6 +236,12 @@ function storageBuildCalculator() {
     calculateResult();
   }
   function calculateResult() {
+    const catalogStatus = document.getElementById('storageCatalogStatus');
+    if (catalogStatus) catalogStatus.textContent = window.STORAGE_CATALOG_STATUS || 'Встроенные сроки';
+    if (window.STORAGE_CATALOG_BLOCKED) {
+      result.textContent = 'Необходимо проверить актуальность сроков. Подожди загрузку или обнови страницу.';
+      return;
+    }
     const item = items[Number(product.value)];
     const startDate = new Date(start.value);
     if (!item || !start.value || Number.isNaN(startDate.getTime())) {
@@ -251,6 +267,7 @@ function storageBuildCalculator() {
   search.addEventListener("input", () => renderProducts(false));
   product.addEventListener("change", calculateResult);
   start.addEventListener("change", calculateResult);
+  document.addEventListener('bk8:storage-updated', () => renderProducts(true));
   renderProducts(false);
 }
 

@@ -22,6 +22,7 @@ jobs:
       - run: node tests/section_lifecycle.cjs
       - run: node tests/navigation_observer.cjs
       - run: node tests/admin_session.cjs
+      - run: node tests/storage_catalog_client.cjs
       - run: node tests/planner_engine.cjs
       - run: node tests/planner_async.cjs
       - run: node tests/planner_roster.cjs
@@ -32,5 +33,8 @@ jobs:
       - run: node tests/planner_routes.cjs
       - run: npm install --prefix .audit-runtime --no-save --ignore-scripts @electric-sql/pglite@0.3.14
       - run: node tests/planner_database.mjs
+        env:
+          PGLITE_CI: '1'
+      - run: node tests/storage_catalog_database.mjs
         env:
           PGLITE_CI: '1'
